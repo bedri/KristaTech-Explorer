@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 57 45" width="57" height="45">
+  <g transform="translate(-180.671875, -149.75)">
+    <!-- Path 3: K body (Salmon #F5897C) -->
+    <path fill="#F5897C" fill-rule="nonzero" d="M 225.105469 194.265625 L 209.386719 172.542969 L 209.386719 194.265625 L 199.753906 194.265625 L 199.753906 170.3125 L 209.386719 170.3125 L 223.976562 149.75 L 235.203125 149.75 L 220.058594 171.078125 L 236.859375 194.265625 Z" />
+    <!-- Path 4: Middle Square (Slate-Blue #7695CD) -->
+    <path fill="#7695CD" fill-rule="nonzero" d="M 190.210938 160.769531 L 199.753906 160.769531 L 199.753906 170.3125 L 190.210938 170.3125 Z" />
+    <!-- Path 5: Right Square (Slate-Blue #7695CD) -->
+    <path fill="#7695CD" fill-rule="nonzero" d="M 199.753906 151.226562 L 209.292969 151.226562 L 209.292969 160.769531 L 199.753906 160.769531 Z" />
+    <!-- Path 6: Left Square (Slate-Blue #7695CD) -->
+    <path fill="#7695CD" fill-rule="nonzero" d="M 180.671875 151.226562 L 190.210938 151.226562 L 190.210938 160.769531 L 180.671875 160.769531 Z" />
+  </g>
+</svg>

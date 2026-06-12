@@ -1,0 +1,145 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme {
+  --color-brand-salmon: #F5897C;
+  --color-brand-blue: #7695CD;
+  --color-brand-salmon-hover: #e07b6f;
+  --color-brand-blue-hover: #6584ba;
+}
+
+:root {
+  --bg-main: #f5f7fa;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --card-bg: rgba(255, 255, 255, 0.75);
+  --card-border: rgba(118, 149, 205, 0.18);
+  --card-shadow: 0 8px 32px 0 rgba(118, 149, 205, 0.06);
+  --card-hover-border: rgba(245, 137, 124, 0.4);
+  --card-hover-shadow: 0 12px 40px 0 rgba(245, 137, 124, 0.12);
+  --radial-1: rgba(245, 137, 124, 0.06);
+  --radial-2: rgba(118, 149, 205, 0.06);
+  --header-bg: rgba(255, 255, 255, 0.8);
+  --header-border: rgba(118, 149, 205, 0.1);
+  --footer-bg: rgba(241, 245, 249, 0.9);
+  --footer-border: rgba(118, 149, 205, 0.1);
+  --table-header-bg: rgba(118, 149, 205, 0.08);
+  --table-border: rgba(118, 149, 205, 0.08);
+  --text-white-or-slate: #0f172a;
+}
+
+.dark {
+  --bg-main: #07090e;
+  --text-main: #e2e8f0;
+  --text-muted: #94a3b8;
+  --card-bg: rgba(13, 17, 28, 0.7);
+  --card-border: rgba(255, 255, 255, 0.06);
+  --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  --card-hover-border: rgba(20, 184, 166, 0.3);
+  --card-hover-shadow: 0 12px 40px 0 rgba(20, 184, 166, 0.15);
+  --radial-1: rgba(245, 137, 124, 0.12);
+  --radial-2: rgba(118, 149, 205, 0.12);
+  --header-bg: rgba(7, 9, 14, 0.8);
+  --header-border: rgba(255, 255, 255, 0.05);
+  --footer-bg: rgba(5, 7, 10, 0.9);
+  --footer-border: rgba(255, 255, 255, 0.05);
+  --table-header-bg: rgba(255, 255, 255, 0.03);
+  --table-border: rgba(255, 255, 255, 0.05);
+  --text-white-or-slate: #ffffff;
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(at 10% 20%, var(--radial-1) 0px, transparent 50%),
+    radial-gradient(at 90% 80%, var(--radial-2) 0px, transparent 50%);
+  background-attachment: fixed;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Glassmorphism utility card */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  border-color: var(--card-hover-border);
+  box-shadow: var(--card-hover-shadow);
+}
+
+/* Neon glow text */
+.text-glow-teal {
+  text-shadow: 0 0 10px rgba(20, 184, 166, 0.6);
+}
+
+.text-glow-indigo {
+  text-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--table-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--card-hover-border);
+}
+
+/* Glowing borders */
+.glow-border {
+  position: relative;
+}
+
+.glow-border::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  background: linear-gradient(to right, var(--color-brand-blue), var(--color-brand-salmon)) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+.glow-border:hover::after {
+  opacity: 0.8;
+}
+
+/* Animation utilities */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
