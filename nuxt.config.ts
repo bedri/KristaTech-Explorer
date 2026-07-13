@@ -13,6 +13,10 @@ export default defineNuxtConfig({
     }
   },
   
+  server: {
+    allowedHosts: ['explorer.kristalteknoloji.com'],
+  },
+
   devServer: {
     port: 27799
   },
