@@ -100,7 +100,7 @@ onUnmounted(() => {
     <div class="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-gray-200 transition-colors duration-300">
     <!-- Main Glassmorphic Header -->
     <header class="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200/60 dark:border-white/5 py-4 transition-colors duration-300">
-      <UContainer class="flex flex-col lg:flex-row items-center justify-between gap-4">
+      <UContainer class="max-w-none w-full flex flex-col lg:flex-row items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 xl:px-12">
         <!-- Logo / Branding -->
         <NuxtLink to="/" class="flex items-center gap-2 group">
           <div class="w-12 h-12 rounded-xl border border-slate-200 dark:border-white/10 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300 p-2 bg-gradient-to-b from-slate-100 to-white dark:from-slate-900 dark:to-slate-950">
@@ -206,14 +206,14 @@ onUnmounted(() => {
 
     <!-- Main Content View -->
     <main class="flex-grow py-8">
-      <UContainer>
+      <UContainer class="max-w-none w-full px-4 sm:px-6 lg:px-8 xl:px-12">
         <NuxtPage />
       </UContainer>
     </main>
 
     <!-- Footer -->
     <footer class="bg-slate-100/80 dark:bg-slate-950/90 border-t border-slate-200/60 dark:border-white/5 py-8 mt-auto transition-colors duration-300">
-      <UContainer class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-500 dark:text-slate-400">
+      <UContainer class="max-w-none w-full flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-500 dark:text-slate-400 px-4 sm:px-6 lg:px-8 xl:px-12">
         <div>
           <span class="font-semibold text-slate-700 dark:text-slate-300">KristaTech Blockchain Explorer</span> &copy; 2026. All rights reserved.
         </div>
