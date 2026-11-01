@@ -1,34 +1,19 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from '~/composables/useI18n'
+import { formatCoins, formatDate, shortenHash } from '~/utils/formatters'
 
 const { t } = useI18n()
 const route = useRoute()
 const addressId = computed(() => route.params.id)
+const currentPage = ref(1)
 const isCopied = ref(false)
 
-const { data: addressResult, error } = await useFetch(() => `/api/address/${addressId.value}`)
+watch(addressId, () => {
+  currentPage.value = 1
+})
 
-// Utility formatting functions
-function formatCoins(amount) {
-  if (amount === undefined || amount === null) return '0.00 KRISTA'
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 8
-  }).format(amount) + ' KRISTA'
-}
-
-function formatDate(timestamp) {
-  if (!timestamp) return 'N/A'
-  const d = new Date(timestamp * 1000)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`
-}
-
-function shortenHash(hash, len = 12) {
-  if (!hash) return ''
-  return `${hash.slice(0, len)}...${hash.slice(-len)}`
-}
+const { data: addressResult, error } = await useFetch(() => `/api/address/${addressId.value}?page=${currentPage.value}&limit=50`)
 
 // Clipboard copy helper
 function copyAddress() {
@@ -38,6 +23,13 @@ function copyAddress() {
   setTimeout(() => {
     isCopied.value = false
   }, 2000)
+}
+
+function changePage(newPage) {
+  if (!addressResult.value?.totalPages) return
+  if (newPage >= 1 && newPage <= addressResult.value.totalPages) {
+    currentPage.value = newPage
+  }
 }
 </script>
 
@@ -53,11 +45,11 @@ function copyAddress() {
 
     <!-- Error State -->
     <div v-if="error || !addressResult?.success" class="p-6 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-500/20 rounded-xl text-center space-y-4">
-      <div class="inline-flex p-3 bg-red-100 dark:bg-red-500/10 rounded-lg text-red-650 dark:text-red-400">
+      <div class="inline-flex p-3 bg-red-100 dark:bg-red-500/10 rounded-lg text-red-600 dark:text-red-400">
         <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8" />
       </div>
       <h3 class="text-xl font-bold text-slate-800 dark:text-white">{{ t('addrNotFound') }}</h3>
-      <p class="text-red-655 dark:text-red-300/80 max-w-md mx-auto">
+      <p class="text-red-600 dark:text-red-300/80 max-w-md mx-auto">
         {{ t('addrNotFoundDesc') }}
       </p>
     </div>
@@ -130,10 +122,34 @@ function copyAddress() {
 
       <!-- Transaction History Table -->
       <div class="space-y-4">
-        <h3 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          <UIcon name="i-heroicons-clock" class="w-5 h-5 text-brand-blue" />
-          {{ t('txHistory') }}
-        </h3>
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <UIcon name="i-heroicons-clock" class="w-5 h-5 text-brand-blue" />
+            {{ t('txHistory') }}
+          </h3>
+
+          <div v-if="addressResult.totalPages > 1" class="flex items-center gap-2 text-xs">
+            <button
+              type="button"
+              :disabled="currentPage <= 1"
+              @click="changePage(currentPage - 1)"
+              class="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 dark:bg-white/5 border border-slate-200 dark:border-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              {{ t('prevPage') }}
+            </button>
+            <span class="text-slate-600 dark:text-slate-300 font-medium">
+              {{ t('pageOf') }} {{ currentPage }} / {{ addressResult.totalPages }}
+            </span>
+            <button
+              type="button"
+              :disabled="currentPage >= addressResult.totalPages"
+              @click="changePage(currentPage + 1)"
+              class="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 dark:bg-white/5 border border-slate-200 dark:border-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              {{ t('nextPage') }}
+            </button>
+          </div>
+        </div>
 
         <div class="glass-card rounded-xl overflow-hidden">
           <div class="overflow-x-auto">
@@ -162,7 +178,7 @@ function copyAddress() {
                     <!-- Sent badge -->
                     <span 
                       v-else-if="tx.sent > 0 && tx.received === 0" 
-                      class="px-2.5 py-0.5 rounded bg-red-500/10 text-red-650 dark:text-red-400 text-xs font-semibold"
+                      class="px-2.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-semibold"
                     >
                       {{ t('outgoing') }}
                     </span>

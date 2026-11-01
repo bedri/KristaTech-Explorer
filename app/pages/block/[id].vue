@@ -1,15 +1,14 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from '~/composables/useI18n'
+import { formatCoins, formatDate, formatBytes } from '~/utils/formatters'
 
 const { t } = useI18n()
 const route = useRoute()
 const blockId = computed(() => route.params.id)
 const toast = useToast()
 
-const { data: result, error, refresh } = await useFetch(() => `/api/block/${blockId.value}`)
-
-
+const { data: result, error } = await useFetch(() => `/api/block/${blockId.value}`)
 
 // Clipboard copy helper
 function copyToClipboard(text, label = 'Content') {
@@ -22,28 +21,6 @@ function copyToClipboard(text, label = 'Content') {
     icon: 'i-heroicons-check-circle',
     timeout: 2000
   })
-}
-
-// Utility formatting functions
-function formatCoins(amount) {
-  if (amount === undefined || amount === null) return '0.00 KRISTA'
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 8
-  }).format(amount) + ' KRISTA'
-}
-
-function formatDate(timestamp) {
-  if (!timestamp) return 'N/A'
-  const d = new Date(timestamp * 1000)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`
-}
-
-function formatBytes(bytes) {
-  if (!bytes) return '0 B'
-  if (bytes < 1024) return bytes + ' B'
-  return (bytes / 1024).toFixed(2) + ' KB'
 }
 </script>
 
@@ -132,7 +109,7 @@ function formatBytes(bytes) {
           </div>
           <div class="space-y-1">
             <p class="text-slate-500 dark:text-slate-300/80 font-medium">{{ t('difficulty') }}</p>
-            <p class="text-slate-800 dark:text-gray-200 font-semibold">{{ result.block.difficulty.toFixed(6) }}</p>
+            <p class="text-slate-800 dark:text-gray-200 font-semibold">{{ Number(result.block.difficulty || 0).toFixed(6) }}</p>
           </div>
           <div class="space-y-1">
             <p class="text-slate-500 dark:text-slate-300/80 font-medium">{{ t('size') }}</p>
@@ -158,10 +135,10 @@ function formatBytes(bytes) {
         <div class="border-b border-slate-200/60 dark:border-white/5 pb-4 flex items-center justify-between">
           <h3 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <UIcon name="i-heroicons-cpu-chip" class="w-5 h-5 text-purple-400" />
-            ADAM Hybrid Consensus Details
+            {{ t('adamDetails') }}
           </h3>
           <span class="px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-xs font-semibold">
-            Active Consensus
+            {{ t('activeConsensus') }}
           </span>
         </div>
 
@@ -234,12 +211,12 @@ function formatBytes(bytes) {
         </div>
 
         <!-- Accordion/Details for ADAM Solutions -->
-        <div class="border-t border-slate-200/60 dark:border-white/5 pt-4">
+        <div v-if="result.block.vAdamSolutions && result.block.vAdamSolutions.length > 0" class="border-t border-slate-200/60 dark:border-white/5 pt-4">
           <details class="group select-none">
             <summary class="flex items-center justify-between cursor-pointer text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors py-2">
               <span class="flex items-center gap-1.5">
                 <UIcon name="i-heroicons-key" class="w-4 h-4 text-purple-400" />
-                {{ t('adamSolutions') }} ({{ result.block.vAdamSolutions.length }})
+                {{ t('adamSolutions') }} ({{ result.block.vAdamSolutions?.length || 0 }})
               </span>
               <UIcon name="i-heroicons-chevron-down" class="w-4 h-4 transition-transform duration-200 group-open:rotate-180" />
             </summary>
@@ -267,7 +244,6 @@ function formatBytes(bytes) {
 
       <!-- ADAM Consensus Pending Activation Card (Only for blocks < 200) -->
       <div v-else-if="result.block.height < 200" class="glass-card rounded-2xl p-6 md:p-8 space-y-6 border border-brand-blue/10 relative overflow-hidden group">
-        <!-- Radial gradient background for visual premium depth -->
         <div class="absolute -right-16 -bottom-16 w-64 h-64 bg-brand-blue/5 rounded-full blur-3xl group-hover:bg-brand-blue/10 transition-all duration-500"></div>
         
         <div class="border-b border-slate-200/60 dark:border-white/5 pb-4 flex items-center justify-between relative z-10">
@@ -330,7 +306,7 @@ function formatBytes(bytes) {
                   </td>
                   <td class="p-4 font-semibold text-slate-800 dark:text-gray-200">{{ formatCoins(tx.value) }}</td>
                   <td class="p-4 text-slate-700 dark:text-gray-300">{{ formatCoins(tx.fee) }}</td>
-                  <td class="p-4 text-slate-650 dark:text-gray-300 text-right">{{ formatDate(tx.time) }}</td>
+                  <td class="p-4 text-slate-600 dark:text-gray-300 text-right">{{ formatDate(tx.time) }}</td>
                 </tr>
               </tbody>
             </table>

@@ -1,7 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
-  devtools: { enabled: true },
+  devtools: { enabled: false },
   modules: ['@nuxt/ui'],
   css: ['~/assets/css/main.css'],
   
@@ -18,12 +18,13 @@ export default defineNuxtConfig({
   },
 
   devServer: {
-    port: 27799
+    port: 27799,
+    host: '127.0.0.1'
   },
   
   runtimeConfig: {
     rpcHost: process.env.NUXT_RPC_HOST || '127.0.0.1',
-    rpcPort: process.env.NUXT_RPC_PORT || '27979',
+    rpcPort: process.env.NUXT_RPC_PORT || '27998',
     rpcCookiePath: process.env.NUXT_RPC_COOKIE_PATH || '',
     rpcUser: process.env.NUXT_RPC_USER || '',
     rpcPassword: process.env.NUXT_RPC_PASSWORD || '',

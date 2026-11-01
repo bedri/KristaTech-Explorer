@@ -1,36 +1,10 @@
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
 import { useI18n } from '~/composables/useI18n'
+import { formatCoins, formatDate, shortenHash, formatBytes } from '~/utils/formatters'
 
 const { t } = useI18n()
 const { data: status, refresh } = await useFetch('/api/status')
-
-// Utility formatting functions
-function formatCoins(amount) {
-  if (amount === undefined || amount === null) return '0.00 KRISTA'
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 8
-  }).format(amount) + ' KRISTA'
-}
-
-function formatDate(timestamp) {
-  if (!timestamp) return 'N/A'
-  const d = new Date(timestamp * 1000)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`
-}
-
-function shortenHash(hash, len = 8) {
-  if (!hash) return ''
-  return `${hash.slice(0, len)}...${hash.slice(-len)}`
-}
-
-function formatBytes(bytes) {
-  if (!bytes) return '0 B'
-  if (bytes < 1024) return bytes + ' B'
-  return (bytes / 1024).toFixed(2) + ' KB'
-}
 
 // Auto-refresh stats every 10 seconds
 let refreshInterval
@@ -112,11 +86,11 @@ onUnmounted(() => {
           </div>
           <div>
             <p class="text-sm font-medium text-slate-500 dark:text-slate-300/80">{{ t('difficulty') }}</p>
-            <h3 class="text-2xl font-bold text-slate-800 dark:text-white mt-1">{{ status.difficulty.toFixed(6) }}</h3>
+            <h3 class="text-2xl font-bold text-slate-800 dark:text-white mt-1">{{ Number(status.difficulty || 0).toFixed(6) }}</h3>
           </div>
         </div>
         <div class="mt-4 text-xs text-slate-600 dark:text-slate-300">
-          <span>Algoritma: X11KVS</span>
+          <span>{{ t('algorithm') }}: X11KVS</span>
         </div>
       </div>
 
@@ -131,7 +105,7 @@ onUnmounted(() => {
           </div>
           <div>
             <p class="text-sm font-medium text-slate-500 dark:text-slate-300/80">{{ t('connMasternode') }}</p>
-            <h3 class="text-2xl font-bold text-slate-800 dark:text-white mt-1">{{ status.connections }} Peer</h3>
+            <h3 class="text-2xl font-bold text-slate-800 dark:text-white mt-1">{{ status.connections }} {{ t('peers') }}</h3>
           </div>
         </div>
         <div class="mt-4 text-xs text-slate-600 dark:text-slate-300 flex gap-2">

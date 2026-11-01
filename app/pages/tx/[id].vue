@@ -1,39 +1,13 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from '~/composables/useI18n'
+import { formatCoins, formatDate, formatBytes, shortenHash } from '~/utils/formatters'
 
 const { t } = useI18n()
 const route = useRoute()
 const txid = computed(() => route.params.id)
 
 const { data: txResult, error } = await useFetch(() => `/api/tx/${txid.value}`)
-
-// Utility formatting functions
-function formatCoins(amount) {
-  if (amount === undefined || amount === null) return '0.00 KRISTA'
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 8
-  }).format(amount) + ' KRISTA'
-}
-
-function formatDate(timestamp) {
-  if (!timestamp) return 'N/A'
-  const d = new Date(timestamp * 1000)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`
-}
-
-function formatBytes(bytes) {
-  if (!bytes) return '0 B'
-  if (bytes < 1024) return bytes + ' B'
-  return (bytes / 1024).toFixed(2) + ' KB'
-}
-
-function shortenHash(hash, len = 10) {
-  if (!hash) return ''
-  return `${hash.slice(0, len)}...${hash.slice(-len)}`
-}
 </script>
 
 <template>
@@ -48,11 +22,11 @@ function shortenHash(hash, len = 10) {
 
     <!-- Error State -->
     <div v-if="error || !txResult?.success" class="p-6 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-500/20 rounded-xl text-center space-y-4">
-      <div class="inline-flex p-3 bg-red-100 dark:bg-red-500/10 rounded-lg text-red-650 dark:text-red-400">
+      <div class="inline-flex p-3 bg-red-100 dark:bg-red-500/10 rounded-lg text-red-600 dark:text-red-400">
         <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8" />
       </div>
       <h3 class="text-xl font-bold text-slate-800 dark:text-white">{{ t('txNotFound') }}</h3>
-      <p class="text-red-650 dark:text-red-300/80 max-w-md mx-auto">
+      <p class="text-red-600 dark:text-red-300/80 max-w-md mx-auto">
         {{ t('txNotFoundDesc') }}
       </p>
     </div>
@@ -83,7 +57,7 @@ function shortenHash(hash, len = 10) {
           <div class="space-y-1">
             <p class="text-slate-500 dark:text-slate-300/80 font-medium">{{ t('includedBlock') }}</p>
             <p class="text-slate-800 dark:text-gray-200 font-semibold">
-              <NuxtLink v-if="txResult.blockheight" :to="`/block/${txResult.blockheight}`" class="text-brand-salmon font-semibold hover:underline">
+              <NuxtLink v-if="txResult.blockheight !== null && txResult.blockheight !== undefined" :to="`/block/${txResult.blockheight}`" class="text-brand-salmon font-semibold hover:underline">
                 #{{ txResult.blockheight }}
               </NuxtLink>
               <span v-else class="text-slate-500 dark:text-slate-300">{{ t('unconfirmed') }}</span>

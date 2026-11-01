@@ -1,16 +1,29 @@
 import { callRpc } from '../../utils/rpc'
 import { dbGet, dbQuery } from '../../utils/db'
 
+function normalizeAmount(val: number | null | undefined): number {
+  return Math.round((val || 0) * 1e8) / 1e8
+}
+
 export default defineEventHandler(async (event) => {
-  const idStr = event.context.params?.id || ''
+  const idStr = (event.context.params?.id || '').trim()
+  const isHeight = /^\d{1,9}$/.test(idStr)
+  const isHash = /^[0-9a-fA-F]{64}$/.test(idStr)
+
+  if (!isHeight && !isHash) {
+    setResponseStatus(event, 400)
+    return {
+      success: false,
+      error: 'Invalid block height or hash format'
+    }
+  }
 
   try {
-    let blockHash = idStr
-    const isHeight = /^\d+$/.test(idStr)
+    let blockHash = idStr.toLowerCase()
 
     // 1. If dynamic parameter is height, resolve hash
     if (isHeight) {
-      const height = parseInt(idStr)
+      const height = parseInt(idStr, 10)
       const dbBlock = await dbGet('SELECT hash FROM blocks WHERE height = ?', [height])
       if (dbBlock) {
         blockHash = dbBlock.hash
@@ -23,10 +36,16 @@ export default defineEventHandler(async (event) => {
     const block = await callRpc('getblock', [blockHash, true])
 
     // 3. Query local indexed transactions for this block
-    const transactions = await dbQuery(
+    const rawTransactions = await dbQuery(
       'SELECT txid, time, value, fee FROM transactions WHERE block_hash = ?',
       [blockHash]
     )
+
+    const transactions = (rawTransactions || []).map((tx: any) => ({
+      ...tx,
+      value: normalizeAmount(tx.value),
+      fee: normalizeAmount(tx.fee)
+    }))
 
     return {
       success: true,
@@ -52,10 +71,11 @@ export default defineEventHandler(async (event) => {
       transactions
     }
   } catch (err: any) {
+    console.error(`[API /block/${idStr}] Error:`, err.message || err)
     setResponseStatus(event, 404)
     return {
       success: false,
-      error: err.message || `Block ${idStr} not found`
+      error: 'Block not found'
     }
   }
 })

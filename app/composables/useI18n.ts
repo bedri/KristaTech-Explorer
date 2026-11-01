@@ -83,7 +83,13 @@ const translations: Record<string, Record<string, string>> = {
     adamPendingDesc: 'This block was mined using the bootstrap Proof-of-Work (PoW) consensus. The ADAM Hybrid Consensus Upgrade (Cooperative PoS) is scheduled to activate at block 200.',
     bootstrapProgress: 'Bootstrap Progress',
     blocksRemaining: 'blocks remaining until ADAM activation.',
-    activeConsensus: 'Active Consensus'
+    activeConsensus: 'Active Consensus',
+    adamDetails: 'ADAM Hybrid Consensus Details',
+    algorithm: 'Algorithm',
+    peers: 'Peers',
+    prevPage: 'Previous',
+    nextPage: 'Next',
+    pageOf: 'Page'
   },
   tr: {
     explorer: 'EXPLORER',
@@ -167,7 +173,13 @@ const translations: Record<string, Record<string, string>> = {
     adamPendingDesc: 'Bu blok, başlangıç Proof-of-Work (PoW) konsensüsü kullanılarak kazılmıştır. ADAM Hibrit Konsensüs Güncellemesi (Cooperative PoS) 200. blokta aktif olacak şekilde planlanmıştır.',
     bootstrapProgress: 'Başlangıç Aşaması İlerlemesi',
     blocksRemaining: 'blok kaldı ADAM konsensüs aktivasyonuna.',
-    activeConsensus: 'Aktif Konsensüs'
+    activeConsensus: 'Aktif Konsensüs',
+    adamDetails: 'ADAM Hibrit Konsensüs Detayları',
+    algorithm: 'Algoritma',
+    peers: 'Peer',
+    prevPage: 'Önceki',
+    nextPage: 'Sonraki',
+    pageOf: 'Sayfa'
   },
   es: {
     explorer: 'EXPLORADOR',
@@ -1033,7 +1045,7 @@ export function useI18n() {
     }
     
     // Check request headers on server
-    if (process.server) {
+    if (import.meta.server) {
       const headers = useRequestHeaders(['accept-language'])
       const resolved = getLocaleFromHeader(headers['accept-language'])
       // Set cookie on server side so it is sent in the response headers
@@ -1054,7 +1066,7 @@ export function useI18n() {
 
   const t = (key: string): string => {
     const dict = translations[currentLocale.value] || translations.en
-    return dict[key] || key
+    return dict[key] || translations.en[key] || key
   }
 
   return {
