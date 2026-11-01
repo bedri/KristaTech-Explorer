@@ -23,8 +23,8 @@ export default defineEventHandler(async (event) => {
     return { success: true, type: 'tx', target: `/tx/${query}` }
   }
 
-  // 3. Check for Wallet Address (usually 34 alphanumeric characters)
-  if (/^[a-zA-Z0-9]{34}$/.test(query)) {
+  // 3. Check for Wallet Address (33 to 36 alphanumeric characters, including 35-char KRISTA addresses)
+  if (/^[a-zA-Z0-9]{33,36}$/.test(query)) {
     return { success: true, type: 'address', target: `/address/${query}` }
   }
 

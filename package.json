@@ -6,7 +6,7 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
-    "preview": "nuxt preview",
+    "preview": "HOST=127.0.0.1 NITRO_HOST=127.0.0.1 PORT=27799 NITRO_PORT=27799 nuxt preview",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {

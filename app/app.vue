@@ -220,7 +220,7 @@ onUnmounted(() => {
         <div class="flex items-center gap-6">
           <a href="https://krista.kristalteknoloji.com" target="_blank" class="hover:text-brand-blue transition-colors">Website</a>
           <a href="https://explorer.kristalteknoloji.com" target="_blank" class="hover:text-brand-blue transition-colors">Explorer</a>
-          <span class="text-xs px-2 py-1 rounded bg-slate-200/50 dark:bg-slate-900 border border-slate-300/50 dark:border-white/5 text-slate-600 dark:text-slate-300">v1.0.0</span>
+          <span class="text-xs px-2 py-1 rounded bg-slate-200/50 dark:bg-slate-900 border border-slate-300/50 dark:border-white/5 text-slate-600 dark:text-slate-300">v1.4.5.9</span>
         </div>
       </UContainer>
     </footer>

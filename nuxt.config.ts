@@ -19,7 +19,7 @@ export default defineNuxtConfig({
   
   runtimeConfig: {
     rpcHost: process.env.NUXT_RPC_HOST || '127.0.0.1',
-    rpcPort: process.env.NUXT_RPC_PORT || '27979',
+    rpcPort: process.env.NUXT_RPC_PORT || '27998',
     rpcCookiePath: process.env.NUXT_RPC_COOKIE_PATH || '',
     rpcUser: process.env.NUXT_RPC_USER || '',
     rpcPassword: process.env.NUXT_RPC_PASSWORD || '',
