@@ -1,4 +1,4 @@
-import { dbGet } from '../utils/db'
+import { dbGet, normalizeTaprootAddress } from '../utils/db'
 
 export default defineEventHandler(async (event) => {
   const query = (getQuery(event).q as string || '').trim()
@@ -23,9 +23,10 @@ export default defineEventHandler(async (event) => {
     return { success: true, type: 'tx', target: `/tx/${query}` }
   }
 
-  // 3. Check for Wallet Address (33 to 36 alphanumeric characters, including 35-char KRISTA addresses)
-  if (/^[a-zA-Z0-9]{33,36}$/.test(query)) {
-    return { success: true, type: 'address', target: `/address/${query}` }
+  // 3. Check for Wallet or Taproot Contract Address (Base58 33-36 chars or 62-char Bech32m kt1p.../tk1p.../rt1p...)
+  if (/^((kt|tk|rt)1p[ac-hj-np-z02-9]{58}|[a-zA-Z0-9]{33,36})$/.test(query)) {
+    const normalized = normalizeTaprootAddress(query)
+    return { success: true, type: 'address', target: `/address/${normalized}` }
   }
 
   return { success: false, error: 'Search query format not recognized' }

@@ -1,7 +1,7 @@
-import { dbGet, dbQuery } from '../../utils/db'
+import { dbGet, dbQuery, normalizeTaprootAddress } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const address = event.context.params?.id || ''
+  const address = normalizeTaprootAddress(event.context.params?.id || '')
 
   try {
     // 1. Calculate received, sent, and net balance
