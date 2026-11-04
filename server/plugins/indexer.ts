@@ -1,6 +1,5 @@
 import { callRpc } from '../utils/rpc'
-import { dbAll, dbGet, dbRun } from '../utils/db'
-import { normalizeTaprootAddress } from '../utils/bech32m'
+import { dbQuery, dbGet, dbRun, normalizeTaprootAddress } from '../utils/db'
 
 let isSyncing = false
 
@@ -25,7 +24,7 @@ async function rollbackBlock(height: number): Promise<boolean> {
 
     await dbRun('BEGIN TRANSACTION')
 
-    const txs = await dbAll('SELECT txid FROM transactions WHERE block_hash = ?', [dbBlock.hash])
+    const txs = await dbQuery('SELECT txid FROM transactions WHERE block_hash = ?', [dbBlock.hash])
     for (const tx of txs) {
       await dbRun('UPDATE vout SET spent_txid = NULL WHERE spent_txid = ?', [tx.txid])
       await dbRun('DELETE FROM vin WHERE txid = ?', [tx.txid])
