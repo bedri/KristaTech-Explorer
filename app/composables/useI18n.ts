@@ -115,7 +115,6 @@ const translations: Record<string, Record<string, string>> = {
     roleLlmq: 'LLMQ Quorum (10%)',
     roleCommittee: 'Committee Validator (40%)',
     roleTreasury: 'Developer Treasury (7%)',
-    roleFaucet: 'Bootstrap Faucet (0.7%)',
     roleProtocolBurn: 'Protocol Burn',
     roleMinerReward: 'Block Reward',
     zeroCoinPow: 'Zero-Coin PoW Registration',
@@ -129,7 +128,6 @@ const translations: Record<string, Record<string, string>> = {
     burnAddressBannerTitle: 'Official KRISTA Burn Address',
     burnAddressBannerDesc: 'Coins sent to this provably unspendable address (automatic protocol burn and voluntary Proof-of-Burn) are permanently removed from circulation.',
     treasuryAddressBadge: 'DEVELOPER TREASURY',
-    faucetAddressBadge: 'BOOTSTRAP FAUCET',
     taprootAddressBadge: 'TAPROOT / CONTRACT ADDRESS',
     lockedValidatorBalance: 'Locked Validator Stake'
   },
@@ -247,7 +245,6 @@ const translations: Record<string, Record<string, string>> = {
     roleLlmq: 'LLMQ Kuorum (%10)',
     roleCommittee: 'Komite Doğrulayıcı (%40)',
     roleTreasury: 'Geliştirici Hazinesi (%7)',
-    roleFaucet: 'Başlangıç Faucet (%0,7)',
     roleProtocolBurn: 'Protokol Yakımı',
     roleMinerReward: 'Blok Ödülü',
     zeroCoinPow: 'Zero-Coin PoW Kaydı',
@@ -261,7 +258,6 @@ const translations: Record<string, Record<string, string>> = {
     burnAddressBannerTitle: 'Resmi KRISTA Yakım Adresi',
     burnAddressBannerDesc: 'Harcanamaz olduğu matematiksel olarak kanıtlanmış bu adrese gönderilen KRISTA coinleri (otomatik protokol yakımı ve gönüllü Proof-of-Burn) kalıcı olarak dolaşımdan çıkarılmıştır.',
     treasuryAddressBadge: 'GELİŞTİRİCİ HAZİNESİ',
-    faucetAddressBadge: 'BAŞLANGIÇ FAUCET',
     taprootAddressBadge: 'TAPROOT / KONTRAT ADRESİ',
     lockedValidatorBalance: 'Aktif Doğrulayıcı Kilidi'
   },

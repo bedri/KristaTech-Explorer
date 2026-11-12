@@ -1,7 +1,6 @@
 import {
   dbGet,
   dbQuery,
-  FAUCET_ADDRESS,
   isBurnAddress,
   normalizeTaprootAddress,
   TREASURY_ADDRESS
@@ -118,7 +117,6 @@ export default defineEventHandler(async (event) => {
       address,
       isBurnAddress: isBurnAddress(address),
       isTreasuryAddress: address === TREASURY_ADDRESS,
-      isFaucetAddress: address === FAUCET_ADDRESS,
       isTaprootAddress: /^(kt|tk|rt)1p[ac-hj-np-z02-9]{58}$/.test(address),
       balance,
       lockedBalance,

@@ -36,7 +36,9 @@ const solvedSeatsCount = computed(() => committeeSeats.value.filter((s) => s.sol
 function rewardRoleLabel(role) {
   switch (role) {
     case 'producer':
-      return t('roleProducer')
+      return (result.value?.block?.height || 0) < 2200
+        ? t('roleProducer').replace('15%', '60%').replace('%15', '%60')
+        : t('roleProducer')
     case 'masternode':
       return t('roleMasternode')
     case 'llmq':
@@ -45,8 +47,6 @@ function rewardRoleLabel(role) {
       return t('roleCommittee')
     case 'treasury':
       return t('roleTreasury')
-    case 'faucet':
-      return t('roleFaucet')
     case 'protocol_burn':
       return `🔥 ${t('roleProtocolBurn')}`
     default:
@@ -66,8 +66,6 @@ function rewardRoleClass(role) {
       return 'bg-sky-500/10 text-sky-600 dark:text-sky-300 border-sky-500/20'
     case 'treasury':
       return 'bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/20'
-    case 'faucet':
-      return 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 border-cyan-500/20'
     case 'protocol_burn':
       return 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20'
     default:
@@ -481,7 +479,7 @@ function copyToClipboard(text, label = 'Content') {
           </div>
         </div>
 
-        <!-- Bootstrap Block Reward Breakdown (Treasury / Faucet / Miner) -->
+        <!-- Bootstrap Block Reward Breakdown (Treasury / Miner) -->
         <div v-if="result.block.rewardOutputs?.length > 0" class="border-t border-slate-200/60 dark:border-white/5 pt-4 space-y-3 relative z-10">
           <h4 class="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
             <UIcon name="i-heroicons-chart-pie" class="w-4 h-4 text-brand-blue" />

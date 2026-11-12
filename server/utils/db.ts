@@ -13,7 +13,6 @@ export const BURN_ADDRESSES = [
 ] as const
 
 export const TREASURY_ADDRESS = 'KTeRC2Kj8hXcuzRohxPp2LtYFRJm2BceRoP'
-export const FAUCET_ADDRESS = 'KThn5Li5BnfGzbNJ92UDH7FL9CZR1VSRGEh'
 
 export function isBurnAddress(addr: string | null | undefined): boolean {
   if (!addr) return false

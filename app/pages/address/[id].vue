@@ -92,12 +92,6 @@ function changePage(newPage) {
                 {{ t('treasuryAddressBadge') }}
               </span>
               <span
-                v-else-if="addressResult.isFaucetAddress"
-                class="text-xs font-semibold px-2.5 py-0.5 rounded bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30"
-              >
-                {{ t('faucetAddressBadge') }}
-              </span>
-              <span
                 v-else-if="addressResult.isTaprootAddress"
                 class="text-xs font-semibold px-2.5 py-0.5 rounded bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30"
               >

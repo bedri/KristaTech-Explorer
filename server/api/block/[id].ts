@@ -1,5 +1,5 @@
 import { callRpc } from '../../utils/rpc'
-import { dbGet, dbQuery, FAUCET_ADDRESS, isBurnAddress, TREASURY_ADDRESS } from '../../utils/db'
+import { dbGet, dbQuery, isBurnAddress, TREASURY_ADDRESS } from '../../utils/db'
 
 function normalizeAmount(val: number | null | undefined): number {
   return Math.round((val || 0) * 1e8) / 1e8
@@ -14,7 +14,6 @@ function classifyRewardOutput(
   const addr = out.address || ''
   if (isBurnAddress(addr)) return 'protocol_burn'
   if (addr === TREASURY_ADDRESS) return 'treasury'
-  if (addr === FAUCET_ADDRESS) return 'faucet'
 
   if (block.height >= 2200) {
     if ((!block.isProofOfStake && out.n === 0) || (block.isProofOfStake && out.n === 1)) {
@@ -30,6 +29,18 @@ function classifyRewardOutput(
       return 'committee'
     }
     return 'masternode'
+  }
+
+  if (block.height >= 200) {
+    if ((!block.isProofOfStake && out.n === 0) || (block.isProofOfStake && out.n === 1)) {
+      return 'producer'
+    }
+    if (block.adamCoordinator && addr === block.adamCoordinator && out.n <= 2) {
+      return 'producer'
+    }
+    if (solvedCommitteeAddrs.has(addr)) {
+      return 'committee'
+    }
   }
 
   return 'miner_reward'
