@@ -25,7 +25,7 @@ async function handleSearch() {
   searchError.value = ''
   
   try {
-    const data = await $fetch(`/api/search?q=${query}`)
+    const data = await $fetch(`/api/search?q=${encodeURIComponent(query)}`)
     if (data.success && data.target) {
       searchQuery.value = ''
       navigateTo(data.target)

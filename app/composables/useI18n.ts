@@ -83,7 +83,55 @@ const translations: Record<string, Record<string, string>> = {
     adamPendingDesc: 'This block was mined using the bootstrap Proof-of-Work (PoW) consensus. The ADAM Hybrid Consensus Upgrade (Cooperative PoS) is scheduled to activate at block 200.',
     bootstrapProgress: 'Bootstrap Progress',
     blocksRemaining: 'blocks remaining until ADAM activation.',
-    activeConsensus: 'Active Consensus'
+    activeConsensus: 'Active Consensus',
+    adamDetails: 'ADAM Hybrid Consensus Details',
+    algorithm: 'Algorithm',
+    peers: 'Peers',
+    prevPage: 'Previous',
+    nextPage: 'Next',
+    pageOf: 'Page',
+    burnedSupply: 'Burned Supply',
+    protocolBurn: 'Protocol',
+    voluntaryBurn: 'PoB Burn',
+    validatorPool: 'Active Validator Pool',
+    validatorsTotal: 'Validators',
+    fundedValidators: 'Funded',
+    trackMasternode: 'MN',
+    trackCoinLock: '250 Lock',
+    trackPowLock: '10 PoW-Lock',
+    trackZeroCoin: 'Zero-Coin',
+    trackBootstrap: 'Bootstrap',
+    adamCoordinator: 'ADAM Block Coordinator',
+    llmqQuorum: 'LLMQ BFT Quorum Approval',
+    llmqVerified: 'BFT Verified',
+    llmqPending: 'ECDSA / Pre-Quorum',
+    llmqSigners: 'LLMQ Signers',
+    quorumSigHex: 'LLMQ Quorum Signature (BLS)',
+    seatSolved: 'Solved',
+    seatEmpty: 'Empty',
+    rewardBreakdown: 'Block Reward & Model D Distribution',
+    roleProducer: 'Producer / Coordinator (15%)',
+    roleMasternode: 'Passive Masternode (35%)',
+    roleLlmq: 'LLMQ Quorum (10%)',
+    roleCommittee: 'Committee Validator (40%)',
+    roleTreasury: 'Developer Treasury (7%)',
+    roleFaucet: 'Bootstrap Faucet (0.7%)',
+    roleProtocolBurn: 'Protocol Burn',
+    roleMinerReward: 'Block Reward',
+    zeroCoinPow: 'Zero-Coin PoW Registration',
+    coinstake: 'COINSTAKE',
+    coinLockBadge: 'Coin-Lock (250)',
+    powLockBadge: 'PoW-Lock (10)',
+    taprootContract: 'Taproot / MESCAL',
+    opReturnBadge: 'OP_RETURN',
+    burnBadge: 'BURN',
+    lockedUntilBlock: 'Unlock Block',
+    burnAddressBannerTitle: 'Official KRISTA Burn Address',
+    burnAddressBannerDesc: 'Coins sent to this provably unspendable address (automatic protocol burn and voluntary Proof-of-Burn) are permanently removed from circulation.',
+    treasuryAddressBadge: 'DEVELOPER TREASURY',
+    faucetAddressBadge: 'BOOTSTRAP FAUCET',
+    taprootAddressBadge: 'TAPROOT / CONTRACT ADDRESS',
+    lockedValidatorBalance: 'Locked Validator Stake'
   },
   tr: {
     explorer: 'EXPLORER',
@@ -167,7 +215,55 @@ const translations: Record<string, Record<string, string>> = {
     adamPendingDesc: 'Bu blok, başlangıç Proof-of-Work (PoW) konsensüsü kullanılarak kazılmıştır. ADAM Hibrit Konsensüs Güncellemesi (Cooperative PoS) 200. blokta aktif olacak şekilde planlanmıştır.',
     bootstrapProgress: 'Başlangıç Aşaması İlerlemesi',
     blocksRemaining: 'blok kaldı ADAM konsensüs aktivasyonuna.',
-    activeConsensus: 'Aktif Konsensüs'
+    activeConsensus: 'Aktif Konsensüs',
+    adamDetails: 'ADAM Hibrit Konsensüs Detayları',
+    algorithm: 'Algoritma',
+    peers: 'Peer',
+    prevPage: 'Önceki',
+    nextPage: 'Sonraki',
+    pageOf: 'Sayfa',
+    burnedSupply: 'Yakılan Arz',
+    protocolBurn: 'Protokol',
+    voluntaryBurn: 'Gönüllü PoB',
+    validatorPool: 'Aktif Doğrulayıcı Havuzu',
+    validatorsTotal: 'Doğrulayıcı',
+    fundedValidators: 'Fonlu',
+    trackMasternode: 'MN',
+    trackCoinLock: '250 Kilit',
+    trackPowLock: '10 PoW-Kilit',
+    trackZeroCoin: 'Zero-Coin',
+    trackBootstrap: 'Bootstrap',
+    adamCoordinator: 'ADAM Blok Koordinatörü',
+    llmqQuorum: 'LLMQ BFT Kuorum Onayı',
+    llmqVerified: 'BFT Doğrulandı',
+    llmqPending: 'ECDSA / Kuorum Öncesi',
+    llmqSigners: 'LLMQ İmzalayanlar',
+    quorumSigHex: 'LLMQ Kuorum İmzası (BLS)',
+    seatSolved: 'Çözüldü',
+    seatEmpty: 'Boş',
+    rewardBreakdown: 'Blok Ödülü & Model D Dağılımı',
+    roleProducer: 'Üretici / Koordinatör (%15)',
+    roleMasternode: 'Pasif Masternode (%35)',
+    roleLlmq: 'LLMQ Kuorum (%10)',
+    roleCommittee: 'Komite Doğrulayıcı (%40)',
+    roleTreasury: 'Geliştirici Hazinesi (%7)',
+    roleFaucet: 'Başlangıç Faucet (%0,7)',
+    roleProtocolBurn: 'Protokol Yakımı',
+    roleMinerReward: 'Blok Ödülü',
+    zeroCoinPow: 'Zero-Coin PoW Kaydı',
+    coinstake: 'COINSTAKE',
+    coinLockBadge: 'Coin-Lock (250)',
+    powLockBadge: 'PoW-Lock (10)',
+    taprootContract: 'Taproot / MESCAL',
+    opReturnBadge: 'OP_RETURN',
+    burnBadge: 'YAKIM',
+    lockedUntilBlock: 'Kilit Açılış Bloğu',
+    burnAddressBannerTitle: 'Resmi KRISTA Yakım Adresi',
+    burnAddressBannerDesc: 'Harcanamaz olduğu matematiksel olarak kanıtlanmış bu adrese gönderilen KRISTA coinleri (otomatik protokol yakımı ve gönüllü Proof-of-Burn) kalıcı olarak dolaşımdan çıkarılmıştır.',
+    treasuryAddressBadge: 'GELİŞTİRİCİ HAZİNESİ',
+    faucetAddressBadge: 'BAŞLANGIÇ FAUCET',
+    taprootAddressBadge: 'TAPROOT / KONTRAT ADRESİ',
+    lockedValidatorBalance: 'Aktif Doğrulayıcı Kilidi'
   },
   es: {
     explorer: 'EXPLORADOR',
@@ -1033,7 +1129,7 @@ export function useI18n() {
     }
     
     // Check request headers on server
-    if (process.server) {
+    if (import.meta.server) {
       const headers = useRequestHeaders(['accept-language'])
       const resolved = getLocaleFromHeader(headers['accept-language'])
       // Set cookie on server side so it is sent in the response headers
@@ -1054,7 +1150,7 @@ export function useI18n() {
 
   const t = (key: string): string => {
     const dict = translations[currentLocale.value] || translations.en
-    return dict[key] || key
+    return dict[key] || translations.en[key] || key
   }
 
   return {

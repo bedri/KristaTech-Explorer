@@ -1,7 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
-  devtools: { enabled: true },
+  devtools: { enabled: false },
   modules: ['@nuxt/ui'],
   css: ['~/assets/css/main.css'],
   
@@ -13,8 +13,13 @@ export default defineNuxtConfig({
     }
   },
   
+  server: {
+    allowedHosts: ['explorer.kristalteknoloji.com'],
+  },
+
   devServer: {
-    port: 27799
+    port: 27799,
+    host: '127.0.0.1'
   },
   
   runtimeConfig: {

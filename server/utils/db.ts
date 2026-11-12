@@ -7,6 +7,19 @@ const BECH32_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l'
 const BECH32M_CONST = 0x2bc830a3
 const LEGACY_BECH32M_CONST = 0x3fffffff
 
+export const BURN_ADDRESSES = [
+  'KTburnCYcDjF1GsXa5k3tc3eZrVVbqefyWr',
+  'KTburnUHdmKMVx4z8BcnZYZCWYKxRgfZp95'
+] as const
+
+export const TREASURY_ADDRESS = 'KTeRC2Kj8hXcuzRohxPp2LtYFRJm2BceRoP'
+export const FAUCET_ADDRESS = 'KThn5Li5BnfGzbNJ92UDH7FL9CZR1VSRGEh'
+
+export function isBurnAddress(addr: string | null | undefined): boolean {
+  if (!addr) return false
+  return (BURN_ADDRESSES as readonly string[]).includes(addr)
+}
+
 function bech32Polymod(values: number[]): number {
   const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
   let chk = 1
@@ -54,26 +67,89 @@ export function normalizeTaprootAddress(address: string): string {
 }
 
 let dbInstance: sqlite3.Database | null = null
+let dbInitPromise: Promise<sqlite3.Database> | null = null
 
-export function getDb(): sqlite3.Database {
-  if (dbInstance) return dbInstance
-
-  // Save database under user home directory
+function getDbPath(): { dbDir: string; dbPath: string } {
   const dbDir = path.join(os.homedir(), '.kristatech-explorer')
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true })
+  const dbPath = path.join(dbDir, 'explorer.db')
+  return { dbDir, dbPath }
+}
+
+function runRaw(db: sqlite3.Database, sql: string, params: any[] = []): Promise<any> {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) reject(err)
+      else resolve(this)
+    })
+  })
+}
+
+function allRaw(db: sqlite3.Database, sql: string, params: any[] = []): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) reject(err)
+      else resolve(rows || [])
+    })
+  })
+}
+
+async function ensureColumn(db: sqlite3.Database, table: string, columnDef: string): Promise<void> {
+  try {
+    await runRaw(db, `ALTER TABLE ${table} ADD COLUMN ${columnDef};`)
+  } catch (_) {
+    // Column already exists — safe to ignore
+  }
+}
+
+export function resetDbConnection(): void {
+  if (dbInstance) {
+    try {
+      dbInstance.close(() => {})
+    } catch (_) {}
+  }
+  dbInstance = null
+  dbInitPromise = null
+}
+
+export function ensureDb(): Promise<sqlite3.Database> {
+  const { dbDir, dbPath } = getDbPath()
+
+  // If the database file was deleted externally (e.g. by reindex.sh), reset the cached connection
+  if (dbInstance && !fs.existsSync(dbPath)) {
+    resetDbConnection()
   }
 
-  const dbPath = path.join(dbDir, 'explorer.db')
-  const db = new sqlite3.Database(dbPath)
+  if (dbInitPromise) {
+    return dbInitPromise
+  }
 
-  // Configure SQLite performance and schemas
-  db.serialize(() => {
-    db.run('PRAGMA journal_mode=WAL;')
-    db.run('PRAGMA synchronous=NORMAL;')
+  dbInitPromise = (async () => {
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true })
+    }
 
-    // Blocks table
-    db.run(`
+    const db = await new Promise<sqlite3.Database>((resolve, reject) => {
+      const instance = new sqlite3.Database(dbPath, (err) => {
+        if (err) reject(err)
+        else resolve(instance)
+      })
+    })
+
+    db.on('error', (err) => {
+      console.error('[DB] Unexpected SQLite error event:', err)
+    })
+
+    if (typeof db.configure === 'function') {
+      db.configure('busyTimeout', 10000)
+    }
+
+    await runRaw(db, 'PRAGMA busy_timeout = 10000;')
+    await runRaw(db, 'PRAGMA journal_mode = WAL;')
+    await runRaw(db, 'PRAGMA synchronous = NORMAL;')
+
+    await runRaw(
+      db,
+      `
       CREATE TABLE IF NOT EXISTS blocks (
         height INTEGER PRIMARY KEY,
         hash TEXT UNIQUE,
@@ -86,23 +162,34 @@ export function getDb(): sqlite3.Database {
         adam_miners TEXT,
         adam_solutions TEXT,
         adam_vrf_proof TEXT,
-        adam_coordinator_sig TEXT
+        adam_coordinator_sig TEXT,
+        adam_coordinator TEXT,
+        adam_seat_algos TEXT,
+        v_quorum_sig TEXT,
+        adam_quorum_signers TEXT
       )
-    `)
+    `
+    )
 
-    // Transactions table
-    db.run(`
+    await runRaw(
+      db,
+      `
       CREATE TABLE IF NOT EXISTS transactions (
         txid TEXT PRIMARY KEY,
         block_hash TEXT,
         time INTEGER,
         value REAL,
-        fee REAL
+        fee REAL,
+        is_coinbase INTEGER DEFAULT 0,
+        is_coinstake INTEGER DEFAULT 0,
+        tx_type TEXT DEFAULT 'standard'
       )
-    `)
+    `
+    )
 
-    // Inputs table (vin)
-    db.run(`
+    await runRaw(
+      db,
+      `
       CREATE TABLE IF NOT EXISTS vin (
         txid TEXT,
         n INTEGER,
@@ -112,51 +199,87 @@ export function getDb(): sqlite3.Database {
         amount REAL,
         PRIMARY KEY (txid, n)
       )
-    `)
+    `
+    )
 
-    // Outputs table (vout)
-    db.run(`
+    await runRaw(
+      db,
+      `
       CREATE TABLE IF NOT EXISTS vout (
         txid TEXT,
         n INTEGER,
         address TEXT,
         amount REAL,
         spent_txid TEXT,
+        script_type TEXT,
+        lock_height INTEGER,
         PRIMARY KEY (txid, n)
       )
-    `)
+    `
+    )
+
+    // Idempotent column migrations for existing databases
+    await ensureColumn(db, 'blocks', 'adam_coordinator TEXT')
+    await ensureColumn(db, 'blocks', 'adam_seat_algos TEXT')
+    await ensureColumn(db, 'blocks', 'v_quorum_sig TEXT')
+    await ensureColumn(db, 'blocks', 'adam_quorum_signers TEXT')
+
+    await ensureColumn(db, 'transactions', 'is_coinbase INTEGER DEFAULT 0')
+    await ensureColumn(db, 'transactions', 'is_coinstake INTEGER DEFAULT 0')
+    await ensureColumn(db, 'transactions', "tx_type TEXT DEFAULT 'standard'")
+
+    await ensureColumn(db, 'vout', 'script_type TEXT')
+    await ensureColumn(db, 'vout', 'lock_height INTEGER')
 
     // Indexes for high performance queries
-    db.run('CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blocks(hash);')
-    db.run('CREATE INDEX IF NOT EXISTS idx_transactions_block ON transactions(block_hash);')
-    db.run('CREATE INDEX IF NOT EXISTS idx_vin_address ON vin(address);')
-    db.run('CREATE INDEX IF NOT EXISTS idx_vout_address ON vout(address);')
-    db.run('CREATE INDEX IF NOT EXISTS idx_vout_spent ON vout(spent_txid);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blocks(hash);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_transactions_block ON transactions(block_hash);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_transactions_time ON transactions(time DESC);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vin_address ON vin(address);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vout_address ON vout(address);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vout_spent ON vout(spent_txid);')
 
     // SEC-11 Migration: upgrade any legacy 0x3fffffff Bech32m Taproot addresses to BIP-350 (0x2bc830a3)
-    db.all(
-      "SELECT DISTINCT address FROM vout WHERE address LIKE 'kt1p%' OR address LIKE 'tk1p%' OR address LIKE 'rt1p%' UNION SELECT DISTINCT address FROM vin WHERE address LIKE 'kt1p%' OR address LIKE 'tk1p%' OR address LIKE 'rt1p%'",
-      [],
-      (err, rows: Array<{ address: string }>) => {
-        if (err || !rows) return
-        for (const row of rows) {
-          const normalized = normalizeTaprootAddress(row.address)
-          if (normalized !== row.address) {
-            db.run('UPDATE vout SET address = ? WHERE address = ?', [normalized, row.address])
-            db.run('UPDATE vin SET address = ? WHERE address = ?', [normalized, row.address])
-          }
+    try {
+      const taprootRows = await allRaw(
+        db,
+        "SELECT DISTINCT address FROM vout WHERE address LIKE 'kt1p%' OR address LIKE 'tk1p%' OR address LIKE 'rt1p%' UNION SELECT DISTINCT address FROM vin WHERE address LIKE 'kt1p%' OR address LIKE 'tk1p%' OR address LIKE 'rt1p%'"
+      )
+      for (const row of taprootRows) {
+        if (!row?.address) continue
+        const normalized = normalizeTaprootAddress(row.address)
+        if (normalized !== row.address) {
+          await runRaw(db, 'UPDATE vout SET address = ? WHERE address = ?', [normalized, row.address])
+          await runRaw(db, 'UPDATE vin SET address = ? WHERE address = ?', [normalized, row.address])
         }
       }
-    )
+    } catch (_) {}
+
+    dbInstance = db
+    return db
+  })().catch((err) => {
+    dbInstance = null
+    dbInitPromise = null
+    throw err
   })
 
+  return dbInitPromise
+}
+
+export function getDb(): sqlite3.Database {
+  if (dbInstance) return dbInstance
+  const { dbDir, dbPath } = getDbPath()
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true })
+  }
+  const db = new sqlite3.Database(dbPath)
   dbInstance = db
   return db
 }
 
 // Promise helpers for database operations
-export function dbQuery(sql: string, params: any[] = []): Promise<any[]> {
-  const db = getDb()
+export async function dbQuery(sql: string, params: any[] = []): Promise<any[]> {
+  const db = await ensureDb()
   return new Promise((resolve, reject) => {
     db.all(sql, params, (err, rows) => {
       if (err) reject(err)
@@ -165,8 +288,8 @@ export function dbQuery(sql: string, params: any[] = []): Promise<any[]> {
   })
 }
 
-export function dbGet(sql: string, params: any[] = []): Promise<any> {
-  const db = getDb()
+export async function dbGet(sql: string, params: any[] = []): Promise<any> {
+  const db = await ensureDb()
   return new Promise((resolve, reject) => {
     db.get(sql, params, (err, row) => {
       if (err) reject(err)
@@ -175,10 +298,10 @@ export function dbGet(sql: string, params: any[] = []): Promise<any> {
   })
 }
 
-export function dbRun(sql: string, params: any[] = []): Promise<any> {
-  const db = getDb()
+export async function dbRun(sql: string, params: any[] = []): Promise<any> {
+  const db = await ensureDb()
   return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
+    db.run(sql, params, function (err) {
       if (err) reject(err)
       else resolve(this)
     })

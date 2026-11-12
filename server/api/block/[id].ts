@@ -1,16 +1,59 @@
 import { callRpc } from '../../utils/rpc'
-import { dbGet, dbQuery } from '../../utils/db'
+import { dbGet, dbQuery, FAUCET_ADDRESS, isBurnAddress, TREASURY_ADDRESS } from '../../utils/db'
+
+function normalizeAmount(val: number | null | undefined): number {
+  return Math.round((val || 0) * 1e8) / 1e8
+}
+
+function classifyRewardOutput(
+  out: any,
+  block: any,
+  solvedCommitteeAddrs: Set<string>,
+  llmqSignerAddrs: Set<string>
+): string {
+  const addr = out.address || ''
+  if (isBurnAddress(addr)) return 'protocol_burn'
+  if (addr === TREASURY_ADDRESS) return 'treasury'
+  if (addr === FAUCET_ADDRESS) return 'faucet'
+
+  if (block.height >= 2200) {
+    if ((!block.isProofOfStake && out.n === 0) || (block.isProofOfStake && out.n === 1)) {
+      return 'producer'
+    }
+    if (block.adamCoordinator && addr === block.adamCoordinator && out.n <= 2) {
+      return 'producer'
+    }
+    if (llmqSignerAddrs.has(addr)) {
+      return 'llmq'
+    }
+    if (solvedCommitteeAddrs.has(addr)) {
+      return 'committee'
+    }
+    return 'masternode'
+  }
+
+  return 'miner_reward'
+}
 
 export default defineEventHandler(async (event) => {
-  const idStr = event.context.params?.id || ''
+  const idStr = (event.context.params?.id || '').trim()
+  const isHeight = /^\d{1,9}$/.test(idStr)
+  const isHash = /^[0-9a-fA-F]{64}$/.test(idStr)
+
+  if (!isHeight && !isHash) {
+    setResponseStatus(event, 400)
+    return {
+      success: false,
+      error: 'Invalid block height or hash format'
+    }
+  }
 
   try {
-    let blockHash = idStr
-    const isHeight = /^\d+$/.test(idStr)
+    let blockHash = idStr.toLowerCase()
 
     // 1. If dynamic parameter is height, resolve hash
     if (isHeight) {
-      const height = parseInt(idStr)
+      const height = parseInt(idStr, 10)
       const dbBlock = await dbGet('SELECT hash FROM blocks WHERE height = ?', [height])
       if (dbBlock) {
         blockHash = dbBlock.hash
@@ -19,14 +62,60 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    // 2. Query node for the block details (gets confirmations and next block pointers)
+    // 2. Query node for the block details (gets confirmations, ADAM v2/Model D fields, and next block pointers)
     const block = await callRpc('getblock', [blockHash, true])
 
     // 3. Query local indexed transactions for this block
-    const transactions = await dbQuery(
-      'SELECT txid, time, value, fee FROM transactions WHERE block_hash = ?',
+    const rawTransactions = await dbQuery(
+      'SELECT txid, time, value, fee, is_coinbase, is_coinstake, tx_type FROM transactions WHERE block_hash = ?',
       [blockHash]
     )
+
+    const transactions = (rawTransactions || []).map((tx: any) => ({
+      ...tx,
+      value: normalizeAmount(tx.value),
+      fee: normalizeAmount(tx.fee),
+      isCoinbase: Boolean(tx.is_coinbase),
+      isCoinstake: Boolean(tx.is_coinstake),
+      txType: tx.tx_type || 'standard'
+    }))
+
+    // 4. Build reward distribution breakdown from the reward transaction (coinbase for PoW, coinstake for PoS)
+    let rewardOutputs: any[] = []
+    if (block.height > 0 && Array.isArray(block.tx) && block.tx.length > 0) {
+      const rewardTxid = block.isProofOfStake && block.tx.length > 1 ? block.tx[1] : block.tx[0]
+      const rawRewardOuts = await dbQuery(
+        'SELECT n, address, amount, script_type FROM vout WHERE txid = ? ORDER BY n ASC',
+        [rewardTxid]
+      )
+
+      const solvedCommitteeAddrs = new Set<string>()
+      if (Array.isArray(block.vAdamMiners) && Array.isArray(block.vAdamSolutions)) {
+        const seatCount =
+          block.vAdamMiners.length === block.vAdamSolutions.length + 1
+            ? block.vAdamSolutions.length
+            : block.vAdamMiners.length
+        for (let i = 0; i < seatCount; i++) {
+          const sol = block.vAdamSolutions[i]
+          if (sol && String(sol).length > 0 && block.vAdamMiners[i]) {
+            solvedCommitteeAddrs.add(block.vAdamMiners[i])
+          }
+        }
+      }
+
+      const llmqSignerAddrs = new Set<string>(
+        Array.isArray(block.adamQuorumSigners?.signers) ? block.adamQuorumSigners.signers : []
+      )
+
+      rewardOutputs = (rawRewardOuts || [])
+        .filter((o: any) => (o.amount || 0) > 0)
+        .map((o: any) => ({
+          n: o.n,
+          address: o.address,
+          amount: normalizeAmount(o.amount),
+          role: classifyRewardOutput(o, block, solvedCommitteeAddrs, llmqSignerAddrs)
+        }))
+    }
 
     return {
       success: true,
@@ -47,15 +136,21 @@ export default defineEventHandler(async (event) => {
         vAdamMiners: block.vAdamMiners || null,
         vAdamSolutions: block.vAdamSolutions || null,
         vAdamVRFProof: block.vAdamVRFProof || null,
-        vAdamCoordinatorSig: block.vAdamCoordinatorSig || null
+        vAdamCoordinatorSig: block.vAdamCoordinatorSig || null,
+        adamCoordinator: block.adamCoordinator || null,
+        adamSeatAlgos: block.adamSeatAlgos || null,
+        vQuorumSig: block.vQuorumSig || null,
+        adamQuorumSigners: block.adamQuorumSigners || null,
+        rewardOutputs
       },
       transactions
     }
   } catch (err: any) {
+    console.error(`[API /block/${idStr}] Error:`, err.message || err)
     setResponseStatus(event, 404)
     return {
       success: false,
-      error: err.message || `Block ${idStr} not found`
+      error: 'Block not found'
     }
   }
 })
