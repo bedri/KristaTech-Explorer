@@ -5,6 +5,8 @@ import {
   normalizeTaprootAddress,
   TREASURY_ADDRESS
 } from '../../utils/db'
+import { getValidatorPoolData } from '../validators'
+import { calculateBlockSubsidy } from '../../../app/utils/protocol'
 
 const SPECIAL_ADDRESS_LABELS = new Set([
   'Genesis',
@@ -46,9 +48,13 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const page = Math.max(1, parseInt((query.page as string) || '1', 10) || 1)
   const limit = Math.min(100, Math.max(10, parseInt((query.limit as string) || '50', 10) || 50))
+  const direction = ((query.direction as string) || 'all').toLowerCase()
   const offset = (page - 1) * limit
 
   try {
+    const heightRow = await dbGet('SELECT MAX(height) as height FROM blocks')
+    const currentHeight = heightRow?.height || 0
+
     // 1. Calculate received, sent, and net balance using satoshi integer arithmetic
     const receivedRow = await dbGet('SELECT SUM(amount) as total FROM vout WHERE address = ?', [address])
     const sentRow = await dbGet('SELECT SUM(amount) as total FROM vin WHERE address = ?', [address])
@@ -79,7 +85,13 @@ export default defineEventHandler(async (event) => {
       [address, address]
     )
     const txCount = countRow?.count || 0
-    const totalPages = Math.max(1, Math.ceil(txCount / limit))
+
+    let havingSql = ''
+    if (direction === 'in') {
+      havingSql = 'HAVING SUM(received) > 0 AND SUM(sent) = 0'
+    } else if (direction === 'out') {
+      havingSql = 'HAVING SUM(sent) > 0'
+    }
 
     // 3. Fetch paginated transactions involving this address
     const rawTransactions = await dbQuery(
@@ -98,11 +110,31 @@ export default defineEventHandler(async (event) => {
         WHERE v.address = ?
       )
       GROUP BY txid
+      ${havingSql}
       ORDER BY time DESC
       LIMIT ? OFFSET ?
     `,
       [address, address, limit, offset]
     )
+
+    let filteredCount = txCount
+    if (direction === 'in' || direction === 'out') {
+      const dirCountRow = await dbGet(
+        `SELECT COUNT(*) as count FROM (
+           SELECT txid, SUM(received) as received, SUM(sent) as sent FROM (
+             SELECT v.txid, v.amount as received, 0 as sent FROM vout v WHERE v.address = ?
+             UNION ALL
+             SELECT v.txid, 0 as received, v.amount as sent FROM vin v WHERE v.address = ?
+           )
+           GROUP BY txid
+           ${havingSql}
+         )`,
+        [address, address]
+      )
+      filteredCount = dirCountRow?.count || 0
+    }
+
+    const totalPages = Math.max(1, Math.ceil(filteredCount / limit))
 
     const transactions = rawTransactions.map((tx: any) => ({
       txid: tx.txid,
@@ -112,9 +144,65 @@ export default defineEventHandler(async (event) => {
       txType: tx.tx_type || 'standard'
     }))
 
+    // 4. Fetch Unspent Outputs (UTXOs) for this address (exclude burn pseudo-ledger if needed, or show top 100)
+    const utxoRows = await dbQuery(
+      `SELECT
+         v.txid, v.n, v.amount, v.script_type, v.lock_height,
+         t.time, b.height as block_height
+       FROM vout v
+       LEFT JOIN transactions t ON v.txid = t.txid
+       LEFT JOIN blocks b ON t.block_hash = b.hash
+       WHERE v.address = ? AND v.spent_txid IS NULL AND v.amount > 0
+       ORDER BY v.amount DESC, t.time DESC
+       LIMIT 100`,
+      [address]
+    )
+
+    const utxos = (utxoRows || []).map((u: any) => ({
+      txid: u.txid,
+      n: u.n,
+      amount: fromSatoshi(toSatoshi(u.amount)),
+      scriptType: u.script_type || 'pubkeyhash',
+      lockHeight: u.lock_height || null,
+      unlockBlocksRemaining: u.lock_height ? Math.max(0, u.lock_height - currentHeight) : 0,
+      time: u.time || null,
+      blockHeight: u.block_height ?? null,
+      confirmations:
+        typeof u.block_height === 'number' ? Math.max(1, currentHeight - u.block_height + 1) : 0
+    }))
+
+    // 5. Validator & Quorum membership + produced/coordinated blocks
+    let validatorEntries: any[] = []
+    let quorumMember: any = null
+    try {
+      const pool = await getValidatorPoolData()
+      validatorEntries = (pool.validators || []).filter((v: any) => v.address === address)
+      quorumMember = (pool.quorum?.members || []).find((m: any) => m.addr === address) || null
+    } catch (_) {}
+
+    const producedRows = await dbQuery(
+      `SELECT height, hash, time, is_pos, reward, solved_seats, adam_coordinator
+       FROM blocks
+       WHERE producer_address = ? OR adam_coordinator = ?
+       ORDER BY height DESC
+       LIMIT 25`,
+      [address, address]
+    )
+
+    const producedBlocks = (producedRows || []).map((b: any) => ({
+      height: b.height,
+      hash: b.hash,
+      time: b.time,
+      isPos: Boolean(b.is_pos),
+      reward: fromSatoshi(toSatoshi(b.reward || calculateBlockSubsidy(b.height))),
+      solvedSeats: b.solved_seats || 0,
+      isCoordinator: b.adam_coordinator === address
+    }))
+
     return {
       success: true,
       address,
+      currentHeight,
       isBurnAddress: isBurnAddress(address),
       isTreasuryAddress: address === TREASURY_ADDRESS,
       isTaprootAddress: /^(kt|tk|rt)1p[ac-hj-np-z02-9]{58}$/.test(address),
@@ -126,8 +214,13 @@ export default defineEventHandler(async (event) => {
       txCount,
       page,
       limit,
+      direction,
       totalPages,
-      transactions
+      transactions,
+      utxos,
+      validatorEntries,
+      quorumMember,
+      producedBlocks
     }
   } catch (err: any) {
     console.error(`[API /address/${address}] Error:`, err.message || err)

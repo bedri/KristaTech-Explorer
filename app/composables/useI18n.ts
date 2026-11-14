@@ -54,7 +54,7 @@ const translations: Record<string, Record<string, string>> = {
     totalReceived: 'Total Received',
     totalSent: 'Total Sent',
     totalTxs: 'Total Transactions',
-    txHistory: 'Transaction History (Last 100)',
+    txHistory: 'Transaction History',
     incoming: 'Received',
     outgoing: 'Sent',
     combined: 'Combined',
@@ -129,7 +129,103 @@ const translations: Record<string, Record<string, string>> = {
     burnAddressBannerDesc: 'Coins sent to this provably unspendable address (automatic protocol burn and voluntary Proof-of-Burn) are permanently removed from circulation.',
     treasuryAddressBadge: 'DEVELOPER TREASURY',
     taprootAddressBadge: 'TAPROOT / CONTRACT ADDRESS',
-    lockedValidatorBalance: 'Locked Validator Stake'
+    lockedValidatorBalance: 'Locked Validator Stake',
+    navDashboard: 'Dashboard',
+    navBlocks: 'Blocks',
+    navTransactions: 'Transactions',
+    navValidators: 'Validators',
+    navMempool: 'Mempool',
+    navRichList: 'Supply & Rich List',
+    navNetwork: 'Network & Analytics',
+    navApi: 'API',
+    navMenu: 'Menu',
+    skipToContent: 'Skip to main content',
+    viewAllBlocks: 'View All Blocks',
+    viewAllTxs: 'View All Transactions',
+    avgBlockTime: 'Avg Block Time',
+    networkHashrate: 'Network Hashrate',
+    blockSubsidy: 'Block Subsidy',
+    nextMilestone: 'Next Protocol Milestone',
+    milestoneEta: 'Est. Time',
+    producerOrCoord: 'Producer / Coordinator',
+    reward: 'Reward',
+    deltaTime: 'Block Δt',
+    allFilter: 'All',
+    filterStandard: 'Transfers',
+    filterRegistrations: 'Registrations',
+    filterRewards: 'Rewards',
+    filterBurns: 'Burns',
+    filterContracts: 'Contracts',
+    blocksExplorerTitle: 'Blockchain Blocks',
+    blocksExplorerDesc: 'Complete chronological ledger of Proof-of-Work and Cooperative Proof-of-Stake blocks, producers, solved ADAM seats, and block intervals.',
+    txsExplorerTitle: 'Network Transactions',
+    txsExplorerDesc: 'Filterable real-time ledger of transfers, Coinbase/Coinstake rewards, Coin-Lock & PoW-Lock validator registrations, burns, and MESCAL contracts.',
+    validatorsTitle: 'ADAM Dual-Track Validators, LLMQ & Masternodes',
+    validatorsDesc: 'Live validator pool, Dual-Track seat quotas (7 MN + 1 Coin-Lock + 3 Open PoW), 65:16:4 Quadratic Coordinator VRF probabilities, and 3-of-5 BLS Quorum.',
+    coordVrfTitle: '65 : 16 : 4 Quadratic Coordinator VRF',
+    coordVrfDesc: 'Square-root collateral tickets (MN = 65, Coin-Lock = 16 [max 1], PoW-Lock = 4 [max 3 = 12]) govern round Coordinator election.',
+    vrfTickets: 'VRF Tickets',
+    vrfSeatProb: 'Per-Seat VRF Odds',
+    vrfTrackShare: 'Track VRF Share',
+    quotaOccupancy: 'Committee Seat Quota',
+    unlockCountdown: 'Unlock Status',
+    activeLease: 'Active until',
+    permanentBootstrap: 'Genesis / On-Chain',
+    tabValidatorPool: 'ADAM Validator Pool',
+    tabLlmqQuorum: 'LLMQ BLS Quorum',
+    tabMasternodes: 'Masternode Registry',
+    noMasternodes: 'No active Masternodes announced yet.',
+    mempoolTitle: 'Live Mempool Inspector',
+    mempoolDesc: 'Real-time unconfirmed transaction queue, pending validator registrations, memory footprint, and fee rates.',
+    mempoolTxCount: 'Pending Transactions',
+    mempoolSize: 'Transaction Bytes',
+    mempoolUsage: 'RAM Usage',
+    mempoolEmpty: 'Mempool is clear — 0 unconfirmed transactions waiting.',
+    waitingTime: 'Waiting',
+    feeRate: 'Fee Rate',
+    richListTitle: 'Token Supply, Burn Ledger & Top Holders',
+    richListDesc: 'Real-time UTXO supply audit: circulating coins, timelocked validator collateral, protocol/PoB burns, and Top 100 balances.',
+    rank: 'Rank',
+    holderAddress: 'Address',
+    supplyShare: 'Supply Share',
+    holderCount: 'Funded Addresses',
+    lockedSupplyCard: 'Locked Validator Collateral',
+    top10Share: 'Top 10 Share',
+    top50Share: 'Top 50 Share',
+    networkTitle: 'Network Telemetry, Analytics & Consensus Roadmap',
+    networkDesc: 'Live block-interval & volume charts, consensus activation schedule, Model D reward simulator, masked peer mesh, and Spork states.',
+    blockTimeChart: 'Recent Block Intervals (Δt vs 30s Target)',
+    blockTxSizeChart: 'Transactions & Block Size Trend',
+    posVsPowRatio: 'Recent PoW / PoS Split',
+    consensusRoadmap: 'Protocol Upgrade Roadmap',
+    modelDSimulator: 'Model D Block Reward Breakdown',
+    connectedPeers: 'Connected Peer Mesh (Privacy-Masked)',
+    sporkGovernance: 'Active Protocol Sporks',
+    apiDocsTitle: 'Public Explorer REST API',
+    apiDocsDesc: 'Zero-auth JSON & plain-text endpoints for wallets, mining pools, exchanges, and CoinGecko / CoinMarketCap supply trackers.',
+    tryEndpoint: 'Test Live',
+    rawJsonTab: 'Raw JSON',
+    overviewTab: 'Overview',
+    utxosTab: 'Unspent Outputs (UTXOs)',
+    validatorTab: 'Validator & Blocks',
+    qrCodeTab: 'QR Code',
+    exportCsv: 'Export CSV',
+    spentInTx: 'Spent in',
+    decodedOpReturn: 'Decoded OP_RETURN Data',
+    mescalDecompiled: 'Decompiled MESCAL Contract',
+    scriptDetails: 'Script ASM & Hex',
+    nonceLabel: 'Nonce',
+    bitsLabel: 'Bits',
+    chainworkLabel: 'Chainwork',
+    totalFeesLabel: 'Total Fees',
+    searchTypeHeight: 'Block Height',
+    searchTypeHash: 'Block / Tx Hash',
+    searchTypeAddress: 'Wallet Address',
+    searchTypeTaproot: 'Taproot Contract',
+    searchTypePubkey: 'Validator PubKey',
+    noUtxos: 'No unspent outputs (UTXOs) currently held by this address.',
+    noCoordinatedBlocks: 'No blocks coordinated or produced by this address yet.',
+    sortStatusTemplate: 'Sorted by'
   },
   tr: {
     explorer: 'EXPLORER',
@@ -184,7 +280,7 @@ const translations: Record<string, Record<string, string>> = {
     totalReceived: 'Toplam Gelen (Received)',
     totalSent: 'Toplam Giden (Sent)',
     totalTxs: 'Toplam İşlem Sayısı',
-    txHistory: 'İşlem Geçmişi (Son 100 İşlem)',
+    txHistory: 'İşlem Geçmişi',
     incoming: 'Gelen',
     outgoing: 'Giden',
     combined: 'Kombine',
@@ -259,7 +355,103 @@ const translations: Record<string, Record<string, string>> = {
     burnAddressBannerDesc: 'Harcanamaz olduğu matematiksel olarak kanıtlanmış bu adrese gönderilen KRISTA coinleri (otomatik protokol yakımı ve gönüllü Proof-of-Burn) kalıcı olarak dolaşımdan çıkarılmıştır.',
     treasuryAddressBadge: 'GELİŞTİRİCİ HAZİNESİ',
     taprootAddressBadge: 'TAPROOT / KONTRAT ADRESİ',
-    lockedValidatorBalance: 'Aktif Doğrulayıcı Kilidi'
+    lockedValidatorBalance: 'Aktif Doğrulayıcı Kilidi',
+    navDashboard: 'Panel',
+    navBlocks: 'Bloklar',
+    navTransactions: 'İşlemler',
+    navValidators: 'Doğrulayıcılar',
+    navMempool: 'Mempool',
+    navRichList: 'Arz & Zenginler',
+    navNetwork: 'Ağ & Analitik',
+    navApi: 'API',
+    navMenu: 'Menü',
+    skipToContent: 'Ana içeriğe geç',
+    viewAllBlocks: 'Tüm Blokları Gör',
+    viewAllTxs: 'Tüm İşlemleri Gör',
+    avgBlockTime: 'Ort. Blok Süresi',
+    networkHashrate: 'Ağ Hashrate',
+    blockSubsidy: 'Blok Ödülü',
+    nextMilestone: 'Sonraki Protokol Aşaması',
+    milestoneEta: 'Tahmini Süre',
+    producerOrCoord: 'Üretici / Koordinatör',
+    reward: 'Ödül',
+    deltaTime: 'Blok Δt',
+    allFilter: 'Tümü',
+    filterStandard: 'Transferler',
+    filterRegistrations: 'Kayıtlar',
+    filterRewards: 'Ödüller',
+    filterBurns: 'Yakımlar',
+    filterContracts: 'Sözleşmeler',
+    blocksExplorerTitle: 'Blokzincir Blokları',
+    blocksExplorerDesc: 'Proof-of-Work ve İşbirlikçi Proof-of-Stake bloklarının, üreticilerin, çözülen ADAM koltuklarının ve blok sürelerinin kronolojik kaydı.',
+    txsExplorerTitle: 'Ağ İşlemleri',
+    txsExplorerDesc: 'Transferler, Coinbase/Coinstake ödülleri, Coin-Lock ve PoW-Lock doğrulayıcı kayıtları, yakımlar ve MESCAL sözleşmeleri için filtrelenebilir gerçek zamanlı akış.',
+    validatorsTitle: 'ADAM Çift Kulvar Doğrulayıcılar, LLMQ & Masternode',
+    validatorsDesc: 'Canlı doğrulayıcı havuzu, Dual-Track koltuk kotaları (7 MN + 1 Coin-Lock + 3 Open PoW), 65:16:4 Karekök Koordinatör VRF olasılıkları ve 3/5 BLS Kuorumu.',
+    coordVrfTitle: '65 : 16 : 4 Karekök Koordinatör VRF',
+    coordVrfDesc: 'Karekök teminat biletleri (MN = 65, Coin-Lock = 16 [maks 1], PoW-Lock = 4 [maks 3 = 12]) tur Koordinatörü seçimini belirler.',
+    vrfTickets: 'VRF Bileti',
+    vrfSeatProb: 'Koltuk VRF Şansı',
+    vrfTrackShare: 'Kulvar VRF Payı',
+    quotaOccupancy: 'Komite Koltuk Kotası',
+    unlockCountdown: 'Kilit Durumu',
+    activeLease: 'Kilit açılışı:',
+    permanentBootstrap: 'Genesis / Zincir İçi',
+    tabValidatorPool: 'ADAM Doğrulayıcı Havuzu',
+    tabLlmqQuorum: 'LLMQ BLS Kuorumu',
+    tabMasternodes: 'Masternode Kayıtları',
+    noMasternodes: 'Henüz duyurulmuş aktif Masternode bulunmuyor.',
+    mempoolTitle: 'Canlı Mempool İnceleyici',
+    mempoolDesc: 'Onay bekleyen işlem kuyruğu, bekleyen doğrulayıcı kayıtları, bellek kullanımı ve ücret oranları.',
+    mempoolTxCount: 'Bekleyen İşlem',
+    mempoolSize: 'İşlem Boyutu',
+    mempoolUsage: 'RAM Kullanımı',
+    mempoolEmpty: 'Mempool temiz — onay bekleyen işlem bulunmuyor.',
+    waitingTime: 'Bekleme',
+    feeRate: 'Ücret Oranı',
+    richListTitle: 'Token Arzı, Yakım Defteri & En Büyük Cüzdanlar',
+    richListDesc: 'Gerçek zamanlı UTXO arz denetimi: dolaşımdaki coinler, zaman kilitli doğrulayıcı teminatları, protokol/PoB yakımları ve İlk 100 bakiye.',
+    rank: 'Sıra',
+    holderAddress: 'Adres',
+    supplyShare: 'Arz Payı',
+    holderCount: 'Bakiyeli Adres',
+    lockedSupplyCard: 'Kilitli Doğrulayıcı Teminatı',
+    top10Share: 'İlk 10 Payı',
+    top50Share: 'İlk 50 Payı',
+    networkTitle: 'Ağ Telemetrisi, Analitik & Konsensüs Yol Haritası',
+    networkDesc: 'Canlı blok aralığı ve hacim grafikleri, konsensüs aktivasyon takvimi, Model D ödül simülatörü, maskelenmiş peer ağı ve Spork durumları.',
+    blockTimeChart: 'Son Blok Süreleri (Δt ve 30sn Hedef)',
+    blockTxSizeChart: 'İşlem Sayısı & Blok Boyutu Trendi',
+    posVsPowRatio: 'Son Bloklarda PoW / PoS Dağılımı',
+    consensusRoadmap: 'Protokol Yükseltme Yol Haritası',
+    modelDSimulator: 'Model D Blok Ödülü Dağılımı',
+    connectedPeers: 'Bağlı Peer Ağı (Gizlilik Korumalı)',
+    sporkGovernance: 'Aktif Protokol Sporkları',
+    apiDocsTitle: 'Açık Explorer REST API',
+    apiDocsDesc: 'Cüzdanlar, madencilik havuzları, borsalar ve CoinGecko / CoinMarketCap arz izleyicileri için kimlik doğrulamasız JSON ve düz metin uç noktaları.',
+    tryEndpoint: 'Canlı Test Et',
+    rawJsonTab: 'Ham JSON',
+    overviewTab: 'Genel Bakış',
+    utxosTab: 'Harcanmamış Çıktılar (UTXO)',
+    validatorTab: 'Doğrulayıcı & Bloklar',
+    qrCodeTab: 'QR Kod',
+    exportCsv: 'CSV İndir',
+    spentInTx: 'Harcanan Tx',
+    decodedOpReturn: 'Çözümlenen OP_RETURN Verisi',
+    mescalDecompiled: 'Çözümlenen MESCAL Sözleşmesi',
+    scriptDetails: 'Script ASM & Hex',
+    nonceLabel: 'Nonce',
+    bitsLabel: 'Bits',
+    chainworkLabel: 'Zincir İşi (Chainwork)',
+    totalFeesLabel: 'Toplam Ücret',
+    searchTypeHeight: 'Blok Yüksekliği',
+    searchTypeHash: 'Blok / İşlem Hash',
+    searchTypeAddress: 'Cüzdan Adresi',
+    searchTypeTaproot: 'Taproot Sözleşmesi',
+    searchTypePubkey: 'Doğrulayıcı PubKey',
+    noUtxos: 'Bu adreste şu anda harcanmamış çıktı (UTXO) bulunmuyor.',
+    noCoordinatedBlocks: 'Bu adres tarafından koordine edilen veya üretilen blok bulunmuyor.',
+    sortStatusTemplate: 'Sıralama ölçütü:'
   },
   es: {
     explorer: 'EXPLORADOR',
@@ -1116,6 +1308,16 @@ function getLocaleFromHeader(acceptLanguage: string | undefined): string {
   return 'en'
 }
 
+export const explorerTranslations = translations
+
+export function translateKey(localeCode: string, key: string): string {
+  if (!key || typeof key !== 'string') return ''
+  const dict = Object.hasOwn(translations, localeCode) ? translations[localeCode]! : translations.en!
+  if (Object.hasOwn(dict, key)) return dict[key]!
+  if (Object.hasOwn(translations.en!, key)) return translations.en![key]!
+  return key
+}
+
 export function useI18n() {
   const currentLocale = useState<string>('explorer_locale_state', () => {
     // Check cookie first
@@ -1123,16 +1325,15 @@ export function useI18n() {
     if (localeCookie.value && supportedLocales.includes(localeCookie.value)) {
       return localeCookie.value
     }
-    
+
     // Check request headers on server
     if (import.meta.server) {
       const headers = useRequestHeaders(['accept-language'])
       const resolved = getLocaleFromHeader(headers['accept-language'])
-      // Set cookie on server side so it is sent in the response headers
       localeCookie.value = resolved
       return resolved
     }
-    
+
     return 'en'
   })
 
@@ -1144,10 +1345,7 @@ export function useI18n() {
     }
   }
 
-  const t = (key: string): string => {
-    const dict = translations[currentLocale.value] || translations.en
-    return dict[key] || translations.en[key] || key
-  }
+  const t = (key: string): string => translateKey(currentLocale.value, key)
 
   return {
     locale: currentLocale,

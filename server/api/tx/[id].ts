@@ -1,5 +1,6 @@
 import { callRpc } from '../../utils/rpc'
 import { dbGet, dbQuery, isBurnAddress } from '../../utils/db'
+import { decodeOpReturnAsm } from '../../../app/utils/formatters'
 
 const ZERO_COIN_SENTINEL_TXID = '0000000000000000000000000000000000000000000000000000000000000001'
 
@@ -75,16 +76,50 @@ export default defineEventHandler(async (event) => {
           amount: out.value || 0,
           spent_txid: null,
           script_type: scriptType,
-          lock_height: m ? parseInt(m[1], 10) : null
+          lock_height: m ? parseInt(m[1], 10) : null,
+          script_asm: out.scriptPubKey?.asm || null,
+          script_hex: out.scriptPubKey?.hex || null
         }
       })
     }
 
-    // Enrich outputs with burn flag
-    vout = (vout || []).map((o: any) => ({
-      ...o,
-      isBurn: isBurnAddress(o.address)
-    }))
+    // Backfill script_asm / script_hex from live RPC tx.vout for any legacy indexed outputs
+    const rpcVoutByN = new Map<number, any>()
+    if (Array.isArray(tx.vout)) {
+      for (const rv of tx.vout) {
+        if (typeof rv?.n === 'number') rpcVoutByN.set(rv.n, rv)
+      }
+    }
+
+    // Enrich outputs with burn flag, script details, OP_RETURN decoder, and MESCAL decompiler
+    const enrichedVout = []
+    for (const o of vout || []) {
+      const rpcOut = rpcVoutByN.get(o.n)
+      const scriptAsm = o.script_asm || rpcOut?.scriptPubKey?.asm || null
+      const scriptHex = o.script_hex || rpcOut?.scriptPubKey?.hex || null
+      const opReturnDecoded =
+        o.script_type === 'nulldata' || o.address === 'OP_RETURN'
+          ? decodeOpReturnAsm(scriptAsm)
+          : null
+
+      let mescalDecompiled: any = null
+      if (o.script_type === 'mescalcontract' && scriptHex) {
+        try {
+          mescalDecompiled = await callRpc('decompilemescal', [scriptHex])
+        } catch (_) {
+          mescalDecompiled = null
+        }
+      }
+
+      enrichedVout.push({
+        ...o,
+        script_asm: scriptAsm,
+        script_hex: scriptHex,
+        isBurn: isBurnAddress(o.address),
+        opReturnDecoded,
+        mescalDecompiled
+      })
+    }
 
     // 3. Resolve block height if blockhash is present
     let blockHeight = null
@@ -105,7 +140,7 @@ export default defineEventHandler(async (event) => {
 
     let feeSats = 0
     let totalInSats = 0
-    const totalOutSats = vout.reduce((sum: number, out: any) => sum + toSatoshi(out.amount), 0)
+    const totalOutSats = enrichedVout.reduce((sum: number, out: any) => sum + toSatoshi(out.amount), 0)
 
     if (!isCoinbase) {
       totalInSats = vin.reduce((sum: number, input: any) => sum + toSatoshi(input.amount), 0)
@@ -114,11 +149,17 @@ export default defineEventHandler(async (event) => {
       }
     }
 
+    const txSize = tx.size || 0
+    const feeRateSatByte = txSize > 0 && feeSats > 0 ? Math.round((feeSats / txSize) * 100) / 100 : 0
+    const rawHex = typeof tx.hex === 'string' && tx.hex.length <= 131072 ? tx.hex : null
+
     return {
       success: true,
       txid: tx.txid,
+      version: tx.version ?? 1,
+      locktime: tx.locktime ?? 0,
       confirmations: tx.confirmations || 0,
-      size: tx.size,
+      size: txSize,
       time: blockTime || tx.time,
       blockhash: tx.blockhash,
       blockheight: blockHeight,
@@ -126,10 +167,23 @@ export default defineEventHandler(async (event) => {
       isCoinstake,
       txType,
       fee: fromSatoshi(feeSats),
+      feeRateSatByte,
       totalIn: fromSatoshi(totalInSats),
       totalOut: fromSatoshi(totalOutSats),
+      hex: rawHex,
       vin,
-      vout
+      vout: enrichedVout,
+      rawTx: {
+        txid: tx.txid,
+        version: tx.version,
+        locktime: tx.locktime,
+        size: tx.size,
+        blockhash: tx.blockhash,
+        confirmations: tx.confirmations,
+        time: tx.time,
+        vin: tx.vin,
+        vout: tx.vout
+      }
     }
   } catch (err: any) {
     console.error(`[API /tx/${txid}] Error:`, err.message || err)

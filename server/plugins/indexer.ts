@@ -1,7 +1,16 @@
 import { callRpc, callRpcBatch } from '../utils/rpc'
-import { dbGet, dbQuery, dbRun, ensureDb, isBurnAddress, normalizeTaprootAddress } from '../utils/db'
+import {
+  dbGet,
+  dbQuery,
+  dbRun,
+  ensureDb,
+  isBurnAddress,
+  normalizeTaprootAddress,
+  TREASURY_ADDRESS
+} from '../utils/db'
 
 let isSyncing = false
+let hasBackfilledLegacy = false
 const BATCH_SIZE = 100
 const ZERO_COIN_SENTINEL_TXID = '0000000000000000000000000000000000000000000000000000000000000001'
 
@@ -19,6 +28,15 @@ function extractCltvLockHeight(asm: string | undefined | null): number | null {
   if (!m || !m[1]) return null
   const val = parseInt(m[1], 10)
   return Number.isFinite(val) ? val : null
+}
+
+function countSolvedSeats(solutions: unknown): number {
+  if (!Array.isArray(solutions)) return 0
+  let solved = 0
+  for (const s of solutions) {
+    if (s && String(s).length > 0) solved++
+  }
+  return solved
 }
 
 async function getNextBlockHeightToSync(): Promise<number> {
@@ -76,42 +94,49 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
   const adamSeatAlgos = block.adamSeatAlgos ? JSON.stringify(block.adamSeatAlgos) : null
   const vQuorumSig = block.vQuorumSig || null
   const adamQuorumSigners = block.adamQuorumSigners ? JSON.stringify(block.adamQuorumSigners) : null
-
-  await dbRun(
-    `INSERT OR REPLACE INTO blocks (
-      height, hash, difficulty, time, tx_count, size, is_pos, is_pow,
-      adam_miners, adam_solutions, adam_vrf_proof, adam_coordinator_sig,
-      adam_coordinator, adam_seat_algos, v_quorum_sig, adam_quorum_signers
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      block.height,
-      block.hash,
-      block.difficulty,
-      block.time,
-      block.tx.length,
-      block.size,
-      isPos,
-      isPow,
-      adamMiners,
-      adamSolutions,
-      adamVrfProof,
-      adamCoordinatorSig,
-      adamCoordinator,
-      adamSeatAlgos,
-      vQuorumSig,
-      adamQuorumSigners
-    ]
-  )
+  const solvedSeats = countSolvedSeats(block.vAdamSolutions)
+  const blockVersion = typeof block.version === 'number' ? block.version : 1
 
   // Special case for Genesis Block (height 0) since its coinbase transaction cannot be fetched via RPC txindex
   if (height === 0) {
+    await dbRun(
+      `INSERT OR REPLACE INTO blocks (
+        height, hash, difficulty, time, tx_count, size, is_pos, is_pow,
+        adam_miners, adam_solutions, adam_vrf_proof, adam_coordinator_sig,
+        adam_coordinator, adam_seat_algos, v_quorum_sig, adam_quorum_signers,
+        producer_address, reward, solved_seats, version
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        block.height,
+        block.hash,
+        block.difficulty,
+        block.time,
+        block.tx.length,
+        block.size,
+        isPos,
+        isPow,
+        adamMiners,
+        adamSolutions,
+        adamVrfProof,
+        adamCoordinatorSig,
+        adamCoordinator,
+        adamSeatAlgos,
+        vQuorumSig,
+        adamQuorumSigners,
+        'Genesis',
+        0,
+        0,
+        blockVersion
+      ]
+    )
+
     const genesisTxid = block.tx[0]
     await dbRun(
       'INSERT OR REPLACE INTO transactions (txid, block_hash, time, value, fee, is_coinbase, is_coinstake, tx_type) VALUES (?, ?, ?, ?, ?, 1, 0, "coinbase")',
       [genesisTxid, block.hash, block.time, 0, 0]
     )
     await dbRun(
-      'INSERT OR REPLACE INTO vout (txid, n, address, amount, spent_txid, script_type, lock_height) VALUES (?, 0, "Genesis", 0, NULL, "genesis", NULL)',
+      'INSERT OR REPLACE INTO vout (txid, n, address, amount, spent_txid, script_type, lock_height, script_asm, script_hex) VALUES (?, 0, "Genesis", 0, NULL, "genesis", NULL, NULL, NULL)',
       [genesisTxid]
     )
     await dbRun(
@@ -120,6 +145,9 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
     )
     return
   }
+
+  let producerAddress: string | null = adamCoordinator
+  let blockRewardSats = 0
 
   for (let txIdx = 0; txIdx < block.tx.length; txIdx++) {
     const txid = block.tx[txIdx]
@@ -144,6 +172,8 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
       let scriptType: string = out.scriptPubKey?.type || 'nonstandard'
       let lockHeight: number | null = null
       let address = 'Nonstandard'
+      const scriptAsm: string | null = out.scriptPubKey?.asm || null
+      const scriptHex: string | null = out.scriptPubKey?.hex || null
 
       if (isCoinstake && out.n === 0 && outSats === 0 && scriptType === 'nonstandard') {
         address = 'Coinstake-Marker'
@@ -163,10 +193,10 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
 
       if (scriptType === 'adam_coinlock') {
         hasCoinLock = true
-        lockHeight = extractCltvLockHeight(out.scriptPubKey?.asm)
+        lockHeight = extractCltvLockHeight(scriptAsm)
       } else if (scriptType === 'adam_powlock') {
         hasPowLock = true
-        lockHeight = extractCltvLockHeight(out.scriptPubKey?.asm)
+        lockHeight = extractCltvLockHeight(scriptAsm)
       } else if (scriptType === 'mescalcontract' || scriptType === 'witness_v1_taproot') {
         hasContractOutput = true
       }
@@ -175,9 +205,22 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
         hasBurnOutput = true
       }
 
+      // Identify block producer address from reward transaction if not already set
+      if (!producerAddress && outSats > 0) {
+        const isRewardTx = (isPow === 1 && isCoinbase) || (isPos === 1 && isCoinstake)
+        if (
+          isRewardTx &&
+          address !== TREASURY_ADDRESS &&
+          !isBurnAddress(address) &&
+          !['Nonstandard', 'Coinbase', 'Coinstake-Marker', 'OP_RETURN'].includes(address)
+        ) {
+          producerAddress = address
+        }
+      }
+
       await dbRun(
-        'INSERT OR REPLACE INTO vout (txid, n, address, amount, spent_txid, script_type, lock_height) VALUES (?, ?, ?, ?, NULL, ?, ?)',
-        [tx.txid, out.n, address, fromSatoshi(outSats), scriptType, lockHeight]
+        'INSERT OR REPLACE INTO vout (txid, n, address, amount, spent_txid, script_type, lock_height, script_asm, script_hex) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)',
+        [tx.txid, out.n, address, fromSatoshi(outSats), scriptType, lockHeight, scriptAsm, scriptHex]
       )
     }
 
@@ -200,10 +243,10 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
         const prevTxid = vinEntry.txid
         const prevVout = vinEntry.vout
 
-        const prevOut = await dbGet(
-          'SELECT address, amount FROM vout WHERE txid = ? AND n = ?',
-          [prevTxid, prevVout]
-        )
+        const prevOut = await dbGet('SELECT address, amount FROM vout WHERE txid = ? AND n = ?', [
+          prevTxid,
+          prevVout
+        ])
 
         if (prevOut) {
           const prevSats = toSatoshi(prevOut.amount)
@@ -212,10 +255,11 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
             [tx.txid, i, prevTxid, prevVout, prevOut.address, fromSatoshi(prevSats)]
           )
 
-          await dbRun(
-            'UPDATE vout SET spent_txid = ? WHERE txid = ? AND n = ?',
-            [tx.txid, prevTxid, prevVout]
-          )
+          await dbRun('UPDATE vout SET spent_txid = ? WHERE txid = ? AND n = ?', [
+            tx.txid,
+            prevTxid,
+            prevVout
+          ])
 
           totalVinSats += prevSats
         } else {
@@ -227,9 +271,13 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
       }
     }
 
-    // C. Calculate fee with exact satoshi arithmetic
+    // C. Calculate fee & block reward with exact satoshi arithmetic
     let feeSats = 0
-    if (!isCoinbase && !isCoinstake) {
+    if (isCoinbase) {
+      blockRewardSats += totalVoutSats
+    } else if (isCoinstake) {
+      blockRewardSats += Math.max(0, totalVoutSats - totalVinSats)
+    } else {
       feeSats = Math.max(0, totalVinSats - totalVoutSats)
     }
 
@@ -257,6 +305,116 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
         txType
       ]
     )
+  }
+
+  await dbRun(
+    `INSERT OR REPLACE INTO blocks (
+      height, hash, difficulty, time, tx_count, size, is_pos, is_pow,
+      adam_miners, adam_solutions, adam_vrf_proof, adam_coordinator_sig,
+      adam_coordinator, adam_seat_algos, v_quorum_sig, adam_quorum_signers,
+      producer_address, reward, solved_seats, version
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      block.height,
+      block.hash,
+      block.difficulty,
+      block.time,
+      block.tx.length,
+      block.size,
+      isPos,
+      isPow,
+      adamMiners,
+      adamSolutions,
+      adamVrfProof,
+      adamCoordinatorSig,
+      adamCoordinator,
+      adamSeatAlgos,
+      vQuorumSig,
+      adamQuorumSigners,
+      producerAddress || 'Miner',
+      fromSatoshi(blockRewardSats),
+      solvedSeats,
+      blockVersion
+    ]
+  )
+}
+
+/**
+ * One-time idempotent backfill for any blocks indexed prior to v2.0 schema columns.
+ */
+async function backfillLegacyBlocksIfNeeded(): Promise<void> {
+  if (hasBackfilledLegacy) return
+  try {
+    const missing = await dbQuery(
+      'SELECT height, hash, is_pos, adam_coordinator, adam_solutions FROM blocks WHERE producer_address IS NULL ORDER BY height ASC LIMIT 500'
+    )
+    if (!missing || missing.length === 0) {
+      hasBackfilledLegacy = true
+      return
+    }
+
+    await dbRun('BEGIN TRANSACTION')
+    for (const row of missing) {
+      if (row.height === 0) {
+        await dbRun(
+          'UPDATE blocks SET producer_address = "Genesis", reward = 0, solved_seats = 0 WHERE height = 0'
+        )
+        continue
+      }
+
+      let solved = 0
+      try {
+        if (row.adam_solutions) {
+          solved = countSolvedSeats(JSON.parse(row.adam_solutions))
+        }
+      } catch (_) {}
+
+      const rewardTx = await dbGet(
+        row.is_pos
+          ? 'SELECT txid, value FROM transactions WHERE block_hash = ? AND is_coinstake = 1 LIMIT 1'
+          : 'SELECT txid, value FROM transactions WHERE block_hash = ? AND is_coinbase = 1 LIMIT 1',
+        [row.hash]
+      )
+
+      let rewardVal = 0
+      let producer = row.adam_coordinator || null
+      if (rewardTx) {
+        if (row.is_pos) {
+          const inRow = await dbGet('SELECT COALESCE(SUM(amount), 0) as total FROM vin WHERE txid = ?', [
+            rewardTx.txid
+          ])
+          rewardVal = fromSatoshi(Math.max(0, toSatoshi(rewardTx.value) - toSatoshi(inRow?.total)))
+        } else {
+          rewardVal = fromSatoshi(toSatoshi(rewardTx.value))
+        }
+
+        if (!producer) {
+          const outs = await dbQuery(
+            'SELECT address, amount FROM vout WHERE txid = ? AND amount > 0 ORDER BY n ASC',
+            [rewardTx.txid]
+          )
+          const match = outs.find(
+            (o: any) =>
+              o.address &&
+              o.address !== TREASURY_ADDRESS &&
+              !isBurnAddress(o.address) &&
+              !['Nonstandard', 'Coinbase', 'Coinstake-Marker', 'OP_RETURN'].includes(o.address)
+          )
+          if (match) producer = match.address
+        }
+      }
+
+      await dbRun(
+        'UPDATE blocks SET producer_address = ?, reward = ?, solved_seats = ? WHERE height = ?',
+        [producer || 'Miner', rewardVal, solved, row.height]
+      )
+    }
+    await dbRun('COMMIT')
+  } catch (err) {
+    console.error('[Indexer] Legacy block backfill error:', err)
+    try {
+      await dbRun('ROLLBACK')
+    } catch (_) {}
   }
 }
 
@@ -292,7 +450,9 @@ async function syncBatch(startHeight: number, endHeight: number): Promise<boolea
     }
     for (let i = 1; i < blocks.length; i++) {
       if (blocks[i]?.previousblockhash && blocks[i].previousblockhash !== blocks[i - 1]?.hash) {
-        console.warn(`[Indexer] Mid-batch reorg detected between heights ${blocks[i - 1]?.height} and ${blocks[i]?.height}. Retrying...`)
+        console.warn(
+          `[Indexer] Mid-batch reorg detected between heights ${blocks[i - 1]?.height} and ${blocks[i]?.height}. Retrying...`
+        )
         return false
       }
     }
@@ -340,13 +500,16 @@ async function checkAndHandleReorg(targetMaxHeight: number): Promise<void> {
 
   // If node height is lower than indexed height (e.g. chain reset), wipe and resync
   if (row.height > targetMaxHeight) {
-    console.warn(`[Indexer] Node height (${targetMaxHeight}) is lower than indexed height (${row.height}). Resetting database...`)
+    console.warn(
+      `[Indexer] Node height (${targetMaxHeight}) is lower than indexed height (${row.height}). Resetting database...`
+    )
     await dbRun('BEGIN TRANSACTION')
     await dbRun('DELETE FROM vin')
     await dbRun('DELETE FROM vout')
     await dbRun('DELETE FROM transactions')
     await dbRun('DELETE FROM blocks')
     await dbRun('COMMIT')
+    hasBackfilledLegacy = false
     return
   }
 
@@ -364,6 +527,7 @@ async function checkAndHandleReorg(targetMaxHeight: number): Promise<void> {
       await dbRun('DELETE FROM transactions')
       await dbRun('DELETE FROM blocks')
       await dbRun('COMMIT')
+      hasBackfilledLegacy = false
       return
     }
 
@@ -388,6 +552,8 @@ async function syncLoop() {
 
   try {
     await ensureDb()
+    await backfillLegacyBlocksIfNeeded()
+
     const nodeInfo = await callRpc('getblockchaininfo')
     const targetMaxHeight = nodeInfo.blocks
 
@@ -408,7 +574,9 @@ async function syncLoop() {
             nextHeightToSync = await getNextBlockHeightToSync()
             continue
           }
-          console.warn(`[Indexer] Failed to sync blocks ${nextHeightToSync}-${endHeight}. Retrying later...`)
+          console.warn(
+            `[Indexer] Failed to sync blocks ${nextHeightToSync}-${endHeight}. Retrying later...`
+          )
           break
         }
         nextHeightToSync = endHeight + 1
@@ -419,7 +587,7 @@ async function syncLoop() {
     console.error('[Indexer] Sync loop error:', err)
   } finally {
     isSyncing = false
-    setTimeout(syncLoop, 5000)
+    setTimeout(syncLoop, 4000)
   }
 }
 

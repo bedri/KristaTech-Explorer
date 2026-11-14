@@ -165,7 +165,11 @@ export function ensureDb(): Promise<sqlite3.Database> {
         adam_coordinator TEXT,
         adam_seat_algos TEXT,
         v_quorum_sig TEXT,
-        adam_quorum_signers TEXT
+        adam_quorum_signers TEXT,
+        producer_address TEXT,
+        reward REAL DEFAULT 0,
+        solved_seats INTEGER DEFAULT 0,
+        version INTEGER DEFAULT 1
       )
     `
     )
@@ -212,6 +216,8 @@ export function ensureDb(): Promise<sqlite3.Database> {
         spent_txid TEXT,
         script_type TEXT,
         lock_height INTEGER,
+        script_asm TEXT,
+        script_hex TEXT,
         PRIMARY KEY (txid, n)
       )
     `
@@ -222,6 +228,10 @@ export function ensureDb(): Promise<sqlite3.Database> {
     await ensureColumn(db, 'blocks', 'adam_seat_algos TEXT')
     await ensureColumn(db, 'blocks', 'v_quorum_sig TEXT')
     await ensureColumn(db, 'blocks', 'adam_quorum_signers TEXT')
+    await ensureColumn(db, 'blocks', 'producer_address TEXT')
+    await ensureColumn(db, 'blocks', 'reward REAL DEFAULT 0')
+    await ensureColumn(db, 'blocks', 'solved_seats INTEGER DEFAULT 0')
+    await ensureColumn(db, 'blocks', 'version INTEGER DEFAULT 1')
 
     await ensureColumn(db, 'transactions', 'is_coinbase INTEGER DEFAULT 0')
     await ensureColumn(db, 'transactions', 'is_coinstake INTEGER DEFAULT 0')
@@ -229,14 +239,21 @@ export function ensureDb(): Promise<sqlite3.Database> {
 
     await ensureColumn(db, 'vout', 'script_type TEXT')
     await ensureColumn(db, 'vout', 'lock_height INTEGER')
+    await ensureColumn(db, 'vout', 'script_asm TEXT')
+    await ensureColumn(db, 'vout', 'script_hex TEXT')
 
     // Indexes for high performance queries
     await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blocks(hash);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_blocks_pos ON blocks(is_pos, height DESC);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_blocks_coordinator ON blocks(adam_coordinator);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_blocks_producer ON blocks(producer_address);')
     await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_transactions_block ON transactions(block_hash);')
     await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_transactions_time ON transactions(time DESC);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_transactions_type_time ON transactions(tx_type, time DESC);')
     await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vin_address ON vin(address);')
     await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vout_address ON vout(address);')
     await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vout_spent ON vout(spent_txid);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vout_unspent_addr ON vout(spent_txid, address);')
 
     // SEC-11 Migration: upgrade any legacy 0x3fffffff Bech32m Taproot addresses to BIP-350 (0x2bc830a3)
     try {

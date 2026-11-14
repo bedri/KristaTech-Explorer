@@ -1,6 +1,12 @@
 import { callRpc } from '../utils/rpc'
 import { BURN_ADDRESSES, dbGet, dbQuery } from '../utils/db'
 import { getValidatorPoolData } from './validators'
+import {
+  buildConsensusInfo,
+  calculateBlockSubsidy,
+  calculateTotalSupply,
+  TARGET_BLOCK_TIME_SECONDS
+} from '../../app/utils/protocol'
 
 const STATUS_CACHE_TTL_MS = 3000
 let cachedStatus: any = null
@@ -19,61 +25,7 @@ function normalizeAmount(val: number | null | undefined): number {
   return Math.round((val || 0) * 1e8) / 1e8
 }
 
-function calculateTotalSupply(height: number): number {
-  if (height <= 0) return 0
-  let supply = 0
-
-  if (height < 10000) {
-    if (height >= 2) {
-      supply += (height - 1) * 100
-    }
-    return supply
-  }
-
-  supply += 9998 * 100 // Blocks 2 to 9999
-
-  const decayInterval = 259200
-  let currentHeight = 10000
-
-  while (currentHeight <= height) {
-    const period = Math.floor((currentHeight - 10000) / decayInterval)
-    const subsidy = 15.0 * Math.pow(0.981, period)
-    const nextDecayHeight = 10000 + (period + 1) * decayInterval
-    const blocksInThisPeriod = Math.min(height - currentHeight + 1, nextDecayHeight - currentHeight)
-
-    supply += blocksInThisPeriod * (Math.floor(subsidy * 1e8 + 0.5) / 1e8)
-    currentHeight += blocksInThisPeriod
-  }
-
-  return normalizeAmount(supply)
-}
-
-function buildConsensusInfo(height: number) {
-  if (height < 200) {
-    return {
-      phase: 'Bootstrap PoW',
-      algorithmLabel: 'Bootstrap PoW • X11KVS'
-    }
-  }
-  if (height < 2000) {
-    return {
-      phase: height >= 705 ? 'ADAM v1.2' : 'ADAM v1',
-      algorithmLabel: 'ADAM v1 • X11KVS + 18-Algo'
-    }
-  }
-  if (height < 2200) {
-    return {
-      phase: 'ADAM v2 (PoMBL)',
-      algorithmLabel: 'ADAM v2 (PoMBL) • X11KVS + 18-Algo 3-Perm'
-    }
-  }
-  return {
-    phase: 'Model D (PoBLS + LLMQ)',
-    algorithmLabel: 'Model D (PoBLS + LLMQ) • X11KVS + 18-Algo 3-Perm'
-  }
-}
-
-async function getBurnStats(indexedHeight: number) {
+export async function getBurnStats(indexedHeight: number) {
   if (indexedHeight === cachedBurnHeight) {
     return cachedBurnStats
   }
@@ -121,22 +73,110 @@ async function getBurnStats(indexedHeight: number) {
   return cachedBurnStats
 }
 
+export async function getCachedStatusData(): Promise<any> {
+  const now = Date.now()
+  if (cachedStatus && now - cachedStatusTime < STATUS_CACHE_TTL_MS) {
+    return cachedStatus
+  }
+
+  if (inflightStatusPromise) {
+    return inflightStatusPromise
+  }
+
+  inflightStatusPromise = fetchStatusData()
+    .then((result) => {
+      cachedStatus = result
+      cachedStatusTime = Date.now()
+      return result
+    })
+    .finally(() => {
+      inflightStatusPromise = null
+    })
+
+  return inflightStatusPromise
+}
+
 async function fetchStatusData(): Promise<any> {
   const indexedRow = await dbGet('SELECT MAX(height) as height FROM blocks')
   const indexedHeight = indexedRow && indexedRow.height !== null ? indexedRow.height : 0
 
-  // Fetch latest 10 blocks
-  const latestBlocks = await dbQuery(
-    'SELECT height, hash, difficulty, time, tx_count, size, is_pos, is_pow, adam_coordinator FROM blocks ORDER BY height DESC LIMIT 10'
+  // Fetch latest 21 blocks to compute 20-block average interval + 10-block dashboard feed with deltaTime
+  const recentBlockRows = await dbQuery(
+    `SELECT height, hash, difficulty, time, tx_count, size, is_pos, is_pow,
+            adam_coordinator, producer_address, reward, solved_seats, version
+     FROM blocks
+     ORDER BY height DESC
+     LIMIT 21`
   )
 
-  // Fetch latest 10 non-empty transactions (fallback to all if none with value > 0)
+  let intervalSum = 0
+  let intervalCount = 0
+  let posBlocksRecent = 0
+  let powBlocksRecent = 0
+
+  for (let i = 0; i < recentBlockRows.length; i++) {
+    const cur = recentBlockRows[i]
+    if (i < 20 && cur.height > 0) {
+      if (cur.is_pos) posBlocksRecent++
+      else powBlocksRecent++
+    }
+    const prev = recentBlockRows[i + 1]
+    if (prev && cur.height === prev.height + 1 && prev.height > 0) {
+      const dt = Math.max(0, (cur.time || 0) - (prev.time || 0))
+      if (dt > 0 && dt < 3600) {
+        intervalSum += dt
+        intervalCount++
+      }
+    }
+  }
+
+  const avgBlockTime =
+    intervalCount > 0
+      ? Math.round((intervalSum / intervalCount) * 10) / 10
+      : TARGET_BLOCK_TIME_SECONDS
+
+  const latestBlocks = recentBlockRows.slice(0, 10).map((b: any, idx: number) => {
+    const prev = recentBlockRows[idx + 1]
+    const deltaTime =
+      prev && b.height === prev.height + 1 && b.height > 0
+        ? Math.max(0, (b.time || 0) - (prev.time || 0))
+        : null
+    return {
+      height: b.height,
+      hash: b.hash,
+      difficulty: b.difficulty,
+      time: b.time,
+      deltaTime,
+      tx_count: b.tx_count,
+      size: b.size,
+      is_pos: b.is_pos,
+      is_pow: b.is_pow,
+      adam_coordinator: b.adam_coordinator,
+      producer_address: b.producer_address || b.adam_coordinator || 'Miner',
+      reward: normalizeAmount(b.reward || calculateBlockSubsidy(b.height)),
+      solved_seats: b.solved_seats || 0,
+      version: b.version || 1
+    }
+  })
+
+  // Fetch latest 12 non-empty transactions joined with block height
   let rawTransactions = await dbQuery(
-    "SELECT txid, block_hash, time, value, fee, is_coinbase, is_coinstake, tx_type FROM transactions WHERE value > 0 OR tx_type = 'zerocoin_pow' ORDER BY time DESC, rowid DESC LIMIT 10"
+    `SELECT t.txid, t.block_hash, b.height as block_height, t.time, t.value, t.fee,
+            t.is_coinbase, t.is_coinstake, t.tx_type
+     FROM transactions t
+     LEFT JOIN blocks b ON t.block_hash = b.hash
+     WHERE t.value > 0 OR t.tx_type = 'zerocoin_pow'
+     ORDER BY t.time DESC, t.rowid DESC
+     LIMIT 12`
   )
   if (!rawTransactions || rawTransactions.length === 0) {
     rawTransactions = await dbQuery(
-      'SELECT txid, block_hash, time, value, fee, is_coinbase, is_coinstake, tx_type FROM transactions ORDER BY time DESC, rowid DESC LIMIT 10'
+      `SELECT t.txid, t.block_hash, b.height as block_height, t.time, t.value, t.fee,
+              t.is_coinbase, t.is_coinstake, t.tx_type
+       FROM transactions t
+       LEFT JOIN blocks b ON t.block_hash = b.hash
+       ORDER BY t.time DESC, t.rowid DESC
+       LIMIT 12`
     )
   }
 
@@ -162,6 +202,26 @@ async function fetchStatusData(): Promise<any> {
     info = await callRpc('getinfo')
   } catch (_) {}
 
+  let hashrate = 0
+  try {
+    const hps = await callRpc('getnetworkhashps')
+    if (typeof hps === 'number' && Number.isFinite(hps) && hps >= 0) {
+      hashrate = hps
+    }
+  } catch (_) {}
+
+  let mempool = { size: 0, bytes: 0, usage: 0 }
+  try {
+    const mp = await callRpc('getmempoolinfo')
+    if (mp && typeof mp === 'object') {
+      mempool = {
+        size: mp.size || 0,
+        bytes: mp.bytes || 0,
+        usage: mp.usage || 0
+      }
+    }
+  } catch (_) {}
+
   let masternodeCount = { total: 0, enabled: 0 }
   try {
     const mnCount = await callRpc('getmasternodecount')
@@ -173,33 +233,52 @@ async function fetchStatusData(): Promise<any> {
     }
   } catch (_) {}
 
+  const lockedUtxoRow = await dbGet(
+    "SELECT COALESCE(SUM(amount), 0) as total FROM vout WHERE spent_txid IS NULL AND script_type IN ('adam_coinlock', 'adam_powlock')"
+  )
+  const lockedTimelockCoins = normalizeAmount(lockedUtxoRow?.total || 0)
+
   const validatorPoolData = await getValidatorPoolData()
   const burnedSupply = await getBurnStats(indexedHeight)
 
   const currentHeight = blockchainInfo?.blocks ?? indexedHeight
   const currentDifficulty = blockchainInfo?.difficulty ?? (latestBlocks[0]?.difficulty || 0)
   const currentChain = blockchainInfo?.chain ?? 'main'
-  const consensusInfo = buildConsensusInfo(currentHeight)
+  const milestone = buildConsensusInfo(currentHeight)
+  const consensusInfo = {
+    phase: milestone.currentEra,
+    phaseTr: milestone.currentEraTr,
+    ...milestone
+  }
 
   const rawSupply =
-    info?.moneysupply !== undefined && info?.moneysupply !== null
+    info?.moneysupply !== undefined && info?.moneysupply !== null && info.moneysupply > 0
       ? normalizeAmount(info.moneysupply)
       : calculateTotalSupply(currentHeight)
 
-  // Subtract coins locked permanently in protocol/PoB KTburn addresses (PoS fee burn is already excluded from moneysupply)
   const circulatingSupply = normalizeAmount(Math.max(0, rawSupply - burnedSupply.ktBurnOutputs))
+  const lockedValidatorSupply = normalizeAmount(lockedTimelockCoins + masternodeCount.enabled * 4200)
+  const currentSubsidy = calculateBlockSubsidy(currentHeight)
 
   return {
     success: true,
     chain: currentChain,
     height: currentHeight,
     difficulty: currentDifficulty,
+    hashrate,
+    avgBlockTime,
+    posBlocksRecent,
+    powBlocksRecent,
     connections: connectionCount,
     masternodes: masternodeCount,
+    mempool,
+    currentSubsidy,
     totalSupply: rawSupply,
     circulatingSupply,
+    lockedValidatorSupply,
     burnedSupply,
     validatorPool: validatorPoolData.summary,
+    coordinatorVrf: validatorPoolData.coordinatorVrf,
     consensusInfo,
     indexedHeight,
     latestBlocks,
@@ -208,31 +287,13 @@ async function fetchStatusData(): Promise<any> {
 }
 
 export default defineEventHandler(async () => {
-  const now = Date.now()
-  if (cachedStatus && now - cachedStatusTime < STATUS_CACHE_TTL_MS) {
-    return cachedStatus
+  try {
+    return await getCachedStatusData()
+  } catch (err) {
+    console.error('[API /status] Error:', err)
+    return {
+      success: false,
+      error: 'Failed to fetch network status'
+    }
   }
-
-  if (inflightStatusPromise) {
-    return inflightStatusPromise
-  }
-
-  inflightStatusPromise = fetchStatusData()
-    .then((result) => {
-      cachedStatus = result
-      cachedStatusTime = Date.now()
-      return result
-    })
-    .catch((err) => {
-      console.error('[API /status] Error:', err)
-      return {
-        success: false,
-        error: 'Failed to fetch network status'
-      }
-    })
-    .finally(() => {
-      inflightStatusPromise = null
-    })
-
-  return inflightStatusPromise
 })
