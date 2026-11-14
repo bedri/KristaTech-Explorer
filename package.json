@@ -8,7 +8,7 @@
     "generate": "nuxt generate",
     "preview": "HOST=127.0.0.1 NITRO_HOST=127.0.0.1 PORT=27799 NITRO_PORT=27799 nuxt preview",
     "postinstall": "nuxt prepare",
-    "test": "node --test tests/*.test.ts"
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "dependencies": {
     "@nuxt/ui": "^4.8.2",

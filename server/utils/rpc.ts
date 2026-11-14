@@ -8,21 +8,35 @@ interface RpcConnectionInfo {
 }
 
 // Strict read-only allowlist of RPC methods permitted by the Explorer
-const ALLOWED_RPC_METHODS = new Set([
+export const ALLOWED_RPC_METHODS = new Set([
   'getblockchaininfo',
   'getconnectioncount',
   'getinfo',
+  'getnetworkhashps',
+  'getmempoolinfo',
+  'getrawmempool',
+  'getpeerinfo',
   'getmasternodecount',
+  'listmasternodes',
   'getadamminers',
   'getadaminfo',
+  'getactivequorum',
+  'spork',
   'getblockhash',
   'getblock',
-  'getrawtransaction'
+  'getrawtransaction',
+  'decompilemescal'
 ])
 
-function assertAllowedRpcMethod(method: string): void {
+export function assertAllowedRpcMethod(method: string, params: any[] = []): void {
   if (!ALLOWED_RPC_METHODS.has(method)) {
     throw new Error(`Disallowed RPC method: ${method}`)
+  }
+  if (method === 'spork') {
+    const subcmd = String(params[0] ?? '')
+    if (subcmd !== 'show' && subcmd !== 'active') {
+      throw new Error(`Disallowed spork subcommand: ${subcmd}`)
+    }
   }
 }
 
@@ -90,7 +104,7 @@ export function getRpcAuth(config: any): string {
 }
 
 export async function callRpc(method: string, params: any[] = []): Promise<any> {
-  assertAllowedRpcMethod(method)
+  assertAllowedRpcMethod(method, params)
 
   const config = useRuntimeConfig()
   const { url, auth } = getRpcConnectionInfo(config)
@@ -127,7 +141,7 @@ export async function callRpcBatch(requests: { method: string; params?: any[] }[
   if (requests.length === 0) return []
 
   for (const req of requests) {
-    assertAllowedRpcMethod(req.method)
+    assertAllowedRpcMethod(req.method, req.params || [])
   }
 
   const config = useRuntimeConfig()

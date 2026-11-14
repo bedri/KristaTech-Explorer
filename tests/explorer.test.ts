@@ -31,6 +31,7 @@ import {
   BURN_ADDRESSES,
   TREASURY_ADDRESS
 } from '../server/utils/db.ts'
+import { ALLOWED_RPC_METHODS, assertAllowedRpcMethod } from '../server/utils/rpc.ts'
 import { explorerTranslations, translateKey } from '../app/composables/useI18n.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -275,5 +276,34 @@ describe('Static Security & Accessibility Audit (Vue + Nitro Server)', () => {
         assert.match(tag, /rel="noopener noreferrer"/, `Missing rel="noopener noreferrer" in ${path.relative(ROOT_DIR, file)}: ${tag}`)
       }
     }
+  })
+
+  it('verifies every server RPC method is allowlisted and blocks mutating RPC commands', () => {
+    const serverFiles = listFilesRecursive(path.join(ROOT_DIR, 'server'), '.ts')
+    for (const file of serverFiles) {
+      const src = fs.readFileSync(file, 'utf8')
+      for (const m of src.matchAll(/callRpc\(\s*['"]([a-zA-Z0-9_]+)['"]/g)) {
+        const method = m[1]!
+        assert.equal(
+          ALLOWED_RPC_METHODS.has(method),
+          true,
+          `RPC method '${method}' in ${path.relative(ROOT_DIR, file)} missing from ALLOWED_RPC_METHODS`
+        )
+      }
+      for (const m of src.matchAll(/method:\s*['"]([a-zA-Z0-9_]+)['"]/g)) {
+        const method = m[1]!
+        if (method === 'POST') continue
+        assert.equal(
+          ALLOWED_RPC_METHODS.has(method),
+          true,
+          `Batch RPC method '${method}' in ${path.relative(ROOT_DIR, file)} missing from ALLOWED_RPC_METHODS`
+        )
+      }
+    }
+
+    assert.doesNotThrow(() => assertAllowedRpcMethod('spork', ['show']))
+    assert.doesNotThrow(() => assertAllowedRpcMethod('spork', ['active']))
+    assert.throws(() => assertAllowedRpcMethod('sendtoaddress', []))
+    assert.throws(() => assertAllowedRpcMethod('spork', ['SPORK_2_INSTANTSEND_ENABLED', 0]))
   })
 })
