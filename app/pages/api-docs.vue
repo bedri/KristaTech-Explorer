@@ -50,7 +50,7 @@ const endpoints = [
   {
     method: 'GET',
     path: '/api/validators',
-    desc: 'Active ADAM validator pool, Dual-Track 7/1/3 quotas, 65:16:4 Coordinator VRF weights, and LLMQ Quorum.',
+    desc: 'Active ADAM validator pool, Dual-Track 7/1/3 Equal-Pay quotas, KTDIP3 Masternodes, 4,200:250:10 Fair Coordinator VRF (≥75% MN floor), and Dynamic LLMQ Quorum.',
     category: 'Consensus'
   },
   {

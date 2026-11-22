@@ -109,43 +109,51 @@ export default defineEventHandler(async () => {
     const roadmap = [
       {
         id: 'bootstrap',
-        height: 0,
-        title: 'Fair Launch Genesis (Zero Premine)',
-        titleTr: 'Adil Başlangıç Genesis (Sıfır Ön Madencilik)',
-        desc: 'X11KVS PoW launch, 0 KRISTA premine, 30s block target.',
-        descTr: 'X11KVS PoW başlangıcı, 0 KRISTA ön madencilik, 30 sn blok hedefi.'
+        height: 1,
+        title: 'Fair Launch, KTDIP3 & UPGRADE_FAIRNESS',
+        titleTr: 'Adil Başlangıç, KTDIP3 ve UPGRADE_FAIRNESS',
+        desc: '0 premine, deterministic KTDIP3 Masternodes, Equal-Pay, PoM 1.25x / PoL 3x / PoB 6x & 4,200:250:10 Fair VRF.',
+        descTr: '0 ön madencilik, deterministik KTDIP3 Masternode, Eşit Ücret, PoM 1.25x / PoL 3x / PoB 6x ve 4.200:250:10 Adil VRF.'
       },
       {
         id: 'adam_v1',
         height: 200,
-        title: 'UPGRADE_ADAM & Dual-Track Quotas',
-        titleTr: 'UPGRADE_ADAM & Çift Kulvar Kotaları',
-        desc: '11+1 cooperative committee, 65:16:4 Quadratic Coordinator VRF, 7 MN / 1 Coin-Lock / 3 Open PoW.',
-        descTr: '11+1 işbirlikçi komite, 65:16:4 Karekök Koordinatör VRF, 7 MN / 1 Coin-Lock / 3 Open PoW.'
+        title: 'UPGRADE_ADAM & Dual-Track (25% / 75%)',
+        titleTr: 'UPGRADE_ADAM & Çift Kulvar (%25 / %75)',
+        desc: '11+1 committee (7 MN / 1 CL / 3 Open PoW), 17 uniform algos, 25% Producer (20%/5% PoS) / 75% Equal-Pay Validators.',
+        descTr: '11+1 komite (7 MN / 1 CL / 3 Açık PoW), 17 tek-geçişli algo, %25 Üretici (PoS %20/%5) / %75 Eşit Ücretli Doğrulayıcı.'
+      },
+      {
+        id: 'open_entry',
+        height: 2500,
+        title: 'Open-Entry Seat & Bootstrap Limit',
+        titleTr: 'Açık Katılım Koltuğu & Bootstrap Limiti',
+        desc: 'Permanent 0-KRISTA Open-Entry seat in Track 2 (2 Funded PoW-Locks + 1 Open-Entry; 240-key / 15-bit Zero-Coin).',
+        descTr: 'Kulvar 2 içinde kalıcı 0-KRISTA Açık Katılım koltuğu (2 Fonlu PoW-Lock + 1 Açık Katılım; 240 anahtar / 15-bit Zero-Coin).'
       },
       {
         id: 'pombl',
-        height: 2000,
-        title: 'UPGRADE_POMBL (v12 3-Perm & PoB)',
-        titleTr: 'UPGRADE_POMBL (v12 3-Perm & PoB)',
-        desc: '18-algo 3-permutation seat puzzles, alternating PoW/PoS slot priority, Proof-of-Burn.',
-        descTr: '18 algoritmalı 3-permütasyon koltuk bulmacaları, dönüşümlü PoW/PoS önceliği ve Proof-of-Burn.'
+        height: 4800,
+        title: 'UPGRADE_POMBL (v12 17-Algo 3-Perm)',
+        titleTr: 'UPGRADE_POMBL (v12 17-Algo 3-Perm)',
+        desc: '17 uniform single-pass algo 3-permutations (4,080 combinations, X11KVS excluded), 33B pubkeys, 3s ADAM / 1s LLMQ grace.',
+        descTr: '17 tek-geçişli algo 3’lü permütasyon (4.080 kombinasyon, X11KVS hariç), 33B anahtar ve 3 sn ADAM / 1 sn LLMQ penceresi.'
       },
       {
         id: 'model_d',
-        height: 2200,
-        title: 'UPGRADE_MODELD (PoBLS + 3-of-5 LLMQ)',
-        titleTr: 'UPGRADE_MODELD (PoBLS + 3/5 LLMQ)',
-        desc: '3-of-5 BLS Quorum anti-substitution finality & full Model D 35/40/15/10 net reward split.',
-        descTr: '3/5 BLS Kuorum blok kesinliği ve tam Model D %35/%40/%15/%10 net ödül dağılımı.'
+        height: 5000,
+        title: 'UPGRADE_MODELD / ADAM v2 & Dynamic LLMQ',
+        titleTr: 'UPGRADE_MODELD / ADAM v2 & Dinamik LLMQ',
+        desc: 'Dynamic BFT LLMQ (3/5–8/15, 1-block lag signer-only + -5/+5 PoSe), Equal-Pay 40%/11, PoS 12%/3% & Depth V2 (#5,001).',
+        descTr: 'Dinamik BFT LLMQ (3/5–8/15, 1-blok gecikmeli + -5/+5 PoSe), Eşit Ücret %40/11, PoS %12/%3 ve Depth V2 (#5.001).'
       },
       {
         id: 'phase_d',
-        height: 10000,
-        title: 'Standard Emission & Quarterly Decay',
-        titleTr: 'Standart Emisyon & Çeyreklik Azaltım',
-        desc: '15 KRISTA base subsidy with smooth -1.9% decay every 259,200 blocks (~90 days).',
-        descTr: '15 KRISTA taban blok ödülü ve her 259.200 blokta (~90 gün) yumuşak -%1,9 azaltım.'
+        height: 259202,
+        title: 'Quarterly Decay Epoch #2',
+        titleTr: 'Çeyreklik Azaltım Dönemi #2',
+        desc: '17 KRISTA Block 2+ base subsidy with smooth -2.15% decay every 259,200 blocks (~90 days).',
+        descTr: 'Blok 2 itibarıyla 17 KRISTA blok ödülü ve her 259.200 blokta (~90 gün) yumuşak -%2,15 azaltım.'
       }
     ].map((item) => ({
       ...item,
@@ -157,6 +165,7 @@ export default defineEventHandler(async () => {
       blocksRemaining: Math.max(0, item.height - currentHeight)
     }))
 
+    const activeMnCount = status.masternodes?.enabled || 0
     const payload = {
       success: true,
       height: currentHeight,
@@ -165,8 +174,8 @@ export default defineEventHandler(async () => {
       difficulty: status.difficulty,
       posBlocksRecent: status.posBlocksRecent,
       powBlocksRecent: status.powBlocksRecent,
-      modelDSplitsCurrent: calculateModelDSplits(currentHeight),
-      modelDSplitsFull: calculateModelDSplits(Math.max(2200, currentHeight)),
+      modelDSplitsCurrent: calculateModelDSplits(currentHeight, undefined, activeMnCount),
+      modelDSplitsFull: calculateModelDSplits(Math.max(5000, currentHeight), undefined, activeMnCount),
       blockSeries,
       txBreakdown,
       roadmap,

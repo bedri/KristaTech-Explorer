@@ -197,6 +197,8 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
       } else if (scriptType === 'adam_powlock') {
         hasPowLock = true
         lockHeight = extractCltvLockHeight(scriptAsm)
+      } else if (scriptType === 'cltv_timelock') {
+        lockHeight = extractCltvLockHeight(scriptAsm)
       } else if (scriptType === 'mescalcontract' || scriptType === 'witness_v1_taproot') {
         hasContractOutput = true
       }

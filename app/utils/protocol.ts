@@ -12,6 +12,7 @@ export interface MilestoneInfo {
 
 export interface CoordinatorWeightSummary {
   mnWeightEach: number
+  effectiveMnWeightEach: number
   coinLockWeightEach: number
   powLockWeightEach: number
   activeMnCount: number
@@ -27,16 +28,31 @@ export interface CoordinatorWeightSummary {
   perMnSeatPct: number
   perCoinLockSeatPct: number
   perPowLockSeatPct: number
+  mnFloorApplied: boolean
 }
 
 export const TARGET_BLOCK_TIME_SECONDS = 30
 export const DECAY_INTERVAL_BLOCKS = 259200
-export const ADAM_COORD_WEIGHT_MASTERNODE = 65
-export const ADAM_COORD_WEIGHT_COIN_LOCK = 16
-export const ADAM_COORD_WEIGHT_POW_LOCK = 4
+export const ADAM_COORD_WEIGHT_MASTERNODE = 4200
+export const ADAM_COORD_WEIGHT_COIN_LOCK = 250
+export const ADAM_COORD_WEIGHT_POW_LOCK = 10
 export const ADAM_MASTERNODE_TRACK_QUOTA = 7
 export const ADAM_COIN_LOCK_TRACK_QUOTA = 1
 export const ADAM_OPEN_POW_TRACK_QUOTA = 3
+export const ADAM_COMMITTEE_SIZE = 11
+export const ADAM_PUZZLE_ALGO_COUNT = 17
+export const ADAM_V12_PERMUTATION_COUNT = 4080
+
+/**
+ * Dynamic BFT LLMQ quorum sizing matching src/llmq.cpp:GetTargetQuorumSize.
+ */
+export function getDynamicLlmqSpec(activeMnCount: number): { size: number; threshold: number } {
+  const count = Math.max(0, Math.floor(Number(activeMnCount) || 0))
+  if (count >= 100) return { size: 15, threshold: 8 }
+  if (count >= 50) return { size: 11, threshold: 6 }
+  if (count >= 25) return { size: 9, threshold: 5 }
+  return { size: 5, threshold: 3 }
+}
 
 export function toSatoshi(amount: number | null | undefined): number {
   return Math.round((amount || 0) * 1e8)
@@ -47,7 +63,7 @@ export function fromSatoshi(sats: number): number {
 }
 
 const FIXED_SCALE = 1000000000000000000n // 10^18
-const DECAY_NUM = 981000000000000000n // 0.981 * 10^18
+const DECAY_NUM = 978500000000000000n // 0.9785 * 10^18
 
 function computeDecayedSubsidySats(period: number): number {
   let factor = FIXED_SCALE
@@ -62,25 +78,19 @@ function computeDecayedSubsidySats(period: number): number {
       base = (base * base + FIXED_SCALE / 2n) / FIXED_SCALE
     }
   }
-  const rawSubsidy = BigInt(15 * 1e8) * factor
+  const rawSubsidy = BigInt(17 * 1e8) * factor
   return Number((rawSubsidy + FIXED_SCALE / 2n) / FIXED_SCALE)
 }
 
 /**
  * Exact C++ CMasternode::GetBlockValue(nHeight) schedule in KRISTA:
  * - Block 0..1: 0 KRISTA spendable (Zero Premine)
- * - Block 2..2200: 40 KRISTA
- * - Block 2201..5000: 30 KRISTA
- * - Block 5001..9999: 20 KRISTA
- * - Block >= 10000: 15 * (0.981 ^ floor((height - 10000) / 259200)) via 128-bit fixed-point math
+ * - Block >= 2: 17 * (0.9785 ^ floor((height - 2) / 259200)) via 128-bit fixed-point math
  */
 export function calculateBlockSubsidy(height: number): number {
   if (!Number.isFinite(height) || height <= 1) return 0
   const h = Math.floor(height)
-  if (h <= 2200) return 40
-  if (h <= 5000) return 30
-  if (h < 10000) return 20
-  const period = Math.floor((h - 10000) / DECAY_INTERVAL_BLOCKS)
+  const period = Math.floor((h - 2) / DECAY_INTERVAL_BLOCKS)
   return fromSatoshi(computeDecayedSubsidySats(period))
 }
 
@@ -92,32 +102,14 @@ export function calculateTotalSupply(height: number): number {
   const h = Math.floor(height)
   let totalSats = 0
 
-  // Bootstrap Phase 1: Blocks 2..2200 -> 40 KRISTA
-  if (h >= 2) {
-    const count = Math.min(h, 2200) - 2 + 1
-    totalSats += count * 40 * 1e8
-  }
-  // Bootstrap Phase 2: Blocks 2201..5000 -> 30 KRISTA
-  if (h >= 2201) {
-    const count = Math.min(h, 5000) - 2201 + 1
-    totalSats += count * 30 * 1e8
-  }
-  // Bootstrap Phase 3: Blocks 5001..9999 -> 20 KRISTA
-  if (h >= 5001) {
-    const count = Math.min(h, 9999) - 5001 + 1
-    totalSats += count * 20 * 1e8
-  }
-  // Maturation Phase: Blocks >= 10000 -> 15 KRISTA with 1.9% quarterly geometric decay
-  if (h >= 10000) {
-    let cur = 10000
-    while (cur <= h) {
-      const period = Math.floor((cur - 10000) / DECAY_INTERVAL_BLOCKS)
-      const nextHeight = 10000 + (period + 1) * DECAY_INTERVAL_BLOCKS
-      const blocksInEpoch = Math.min(h - cur + 1, nextHeight - cur)
-      const subsidySats = computeDecayedSubsidySats(period)
-      totalSats += blocksInEpoch * subsidySats
-      cur += blocksInEpoch
-    }
+  let cur = 2
+  while (cur <= h) {
+    const period = Math.floor((cur - 2) / DECAY_INTERVAL_BLOCKS)
+    const nextHeight = 2 + (period + 1) * DECAY_INTERVAL_BLOCKS
+    const blocksInEpoch = Math.min(h - cur + 1, nextHeight - cur)
+    const subsidySats = computeDecayedSubsidySats(period)
+    totalSats += blocksInEpoch * subsidySats
+    cur += blocksInEpoch
   }
 
   return fromSatoshi(totalSats)
@@ -141,71 +133,71 @@ export function buildConsensusInfo(height: number): MilestoneInfo {
     }
   }
 
-  if (h < 2000) {
-    const rem = 2000 - h
-    const span = 2000 - 200
+  if (h < 2500) {
+    const rem = 2500 - h
+    const span = 2500 - 200
     return {
-      currentEra: h >= 705 ? 'ADAM v1.2 (Dual-Track)' : 'ADAM v1',
-      currentEraTr: h >= 705 ? 'ADAM v1.2 (Çift Kulvar)' : 'ADAM v1',
-      algorithmLabel: 'ADAM v1 • X11KVS + 18-Algo',
-      nextHeight: 2000,
-      nextLabel: 'UPGRADE_POMBL (v12 3-Perm & PoB)',
-      nextLabelTr: 'UPGRADE_POMBL (v12 3-Perm & PoB)',
+      currentEra: 'ADAM Dual-Track (Pre-Model D)',
+      currentEraTr: 'ADAM Çift Kulvar (Model D Öncesi)',
+      algorithmLabel: 'ADAM Dual-Track • 17-Algo VRF',
+      nextHeight: 2500,
+      nextLabel: 'Permanent 0-KRISTA Open-Entry Seat',
+      nextLabelTr: 'Kalıcı 0-KRISTA Açık Katılım Koltuğu',
       progressPct: Math.min(100, Math.round(((h - 200) / span) * 1000) / 10),
       blocksRemaining: rem,
       etaSeconds: rem * TARGET_BLOCK_TIME_SECONDS
     }
   }
 
-  if (h < 2200) {
-    const rem = 2200 - h
+  if (h < 4800) {
+    const rem = 4800 - h
+    const span = 4800 - 2500
     return {
-      currentEra: 'ADAM v2 (PoMBL)',
-      currentEraTr: 'ADAM v2 (PoMBL)',
-      algorithmLabel: 'ADAM v2 (PoMBL) • X11KVS + 18-Algo 3-Perm',
-      nextHeight: 2200,
-      nextLabel: 'UPGRADE_MODELD (PoBLS + 3-of-5 LLMQ)',
-      nextLabelTr: 'UPGRADE_MODELD (PoBLS + 3/5 LLMQ)',
-      progressPct: Math.min(100, Math.round(((h - 2000) / 200) * 1000) / 10),
+      currentEra: 'ADAM Dual-Track • Open-Entry Active',
+      currentEraTr: 'ADAM Çift Kulvar • Açık Katılım Aktif',
+      algorithmLabel: 'ADAM Dual-Track • 17-Algo VRF',
+      nextHeight: 4800,
+      nextLabel: 'UPGRADE_POMBL (v12 17-Algo 3-Perm)',
+      nextLabelTr: 'UPGRADE_POMBL (v12 17-Algo 3-Perm)',
+      progressPct: Math.min(100, Math.round(((h - 2500) / span) * 1000) / 10),
       blocksRemaining: rem,
       etaSeconds: rem * TARGET_BLOCK_TIME_SECONDS
     }
   }
 
-  if (h < 10000) {
-    const rem = 10000 - h
-    const span = 10000 - 2200
+  if (h < 5000) {
+    const rem = 5000 - h
     return {
-      currentEra: 'Model D (PoBLS + LLMQ)',
-      currentEraTr: 'Model D (PoBLS + LLMQ)',
-      algorithmLabel: 'Model D (PoBLS + LLMQ) • 65:16:4 VRF',
-      nextHeight: 10000,
-      nextLabel: 'Standard Emission (15 KRISTA & -1.9%/Q)',
-      nextLabelTr: 'Standart Emisyon (15 KRISTA & -%1.9/Çeyrek)',
-      progressPct: Math.min(100, Math.round(((h - 2200) / span) * 1000) / 10),
+      currentEra: 'PoMBL (Block v12)',
+      currentEraTr: 'PoMBL (Blok v12)',
+      algorithmLabel: 'PoMBL v12 • 17-Algo 3-Perm (4,080)',
+      nextHeight: 5000,
+      nextLabel: 'UPGRADE_MODELD / ADAM v2 (PoBLS + Dynamic LLMQ)',
+      nextLabelTr: 'UPGRADE_MODELD / ADAM v2 (PoBLS + Dinamik LLMQ)',
+      progressPct: Math.min(100, Math.round(((h - 4800) / 200) * 1000) / 10),
       blocksRemaining: rem,
       etaSeconds: rem * TARGET_BLOCK_TIME_SECONDS
     }
   }
 
-  const period = Math.floor((h - 10000) / DECAY_INTERVAL_BLOCKS)
-  const start = 10000 + period * DECAY_INTERVAL_BLOCKS
+  const period = Math.floor((h - 2) / DECAY_INTERVAL_BLOCKS)
+  const start = 2 + period * DECAY_INTERVAL_BLOCKS
   const nextHeight = start + DECAY_INTERVAL_BLOCKS
   const rem = nextHeight - h
   return {
-    currentEra: `Model D • Epoch #${period + 1}`,
-    currentEraTr: `Model D • Dönem #${period + 1}`,
-    algorithmLabel: 'Model D (PoBLS + LLMQ) • 65:16:4 VRF',
+    currentEra: period === 0 ? 'Model D (PoBLS + Dynamic LLMQ)' : `Model D • Epoch #${period + 1}`,
+    currentEraTr: period === 0 ? 'Model D (PoBLS + Dinamik LLMQ)' : `Model D • Dönem #${period + 1}`,
+    algorithmLabel: 'Model D • 4,200:250:10 Fair VRF',
     nextHeight,
-    nextLabel: `Emission Decay Epoch #${period + 2} (-1.9%)`,
-    nextLabelTr: `Emisyon Azaltım Dönemi #${period + 2} (-%1.9)`,
+    nextLabel: `Emission Decay Epoch #${period + 2} (-2.15%)`,
+    nextLabelTr: `Emisyon Azaltım Dönemi #${period + 2} (-%2.15)`,
     progressPct: Math.min(100, Math.round(((h - start) / DECAY_INTERVAL_BLOCKS) * 1000) / 10),
     blocksRemaining: rem,
     etaSeconds: rem * TARGET_BLOCK_TIME_SECONDS
   }
 }
 
-export function calculateModelDSplits(height: number, customSubsidy?: number) {
+export function calculateModelDSplits(height: number, customSubsidy?: number, activeMnCount = 0) {
   const subsidy = customSubsidy !== undefined ? customSubsidy : calculateBlockSubsidy(height)
   const totalSats = toSatoshi(subsidy)
   if (totalSats <= 0) {
@@ -215,9 +207,13 @@ export function calculateModelDSplits(height: number, customSubsidy?: number) {
       netPool: 0,
       passiveMn: 0,
       producer: 0,
+      posStaker: 0,
+      posCoordinator: 0,
       llmqTotal: 0,
       llmqPerSigner: 0,
+      llmqQuorumSize: 0,
       committeeTotal: 0,
+      committeeSeatEach: 0,
       mnSeatEach: 0,
       coinLockSeat: 0,
       openPowSeatEach: 0
@@ -234,44 +230,55 @@ export function calculateModelDSplits(height: number, customSubsidy?: number) {
       netPool: fromSatoshi(netPoolSats),
       passiveMn: 0,
       producer: fromSatoshi(netPoolSats),
+      posStaker: fromSatoshi(netPoolSats),
+      posCoordinator: 0,
       llmqTotal: 0,
       llmqPerSigner: 0,
+      llmqQuorumSize: 0,
       committeeTotal: 0,
+      committeeSeatEach: 0,
       mnSeatEach: 0,
       coinLockSeat: 0,
       openPowSeatEach: 0
     }
   }
 
-  if (height < 2200) {
-    const producerSats = Math.floor((netPoolSats * 60) / 100)
-    const committeeSats = netPoolSats - producerSats
-    const mnTrackSats = Math.floor((netPoolSats * 20) / 100)
-    const coinLockSats = Math.floor((netPoolSats * 8) / 100)
-    const openPowTrackSats = committeeSats - mnTrackSats - coinLockSats
+  if (height < 5000) {
+    // UPGRADE_FAIRNESS Pre-Model D: 25% Producer (PoS: 20% Staker + 5% Coord) / 75% Equal-Pay Validators (11 seats)
+    const committeeSats = Math.floor((netPoolSats * 75) / 100)
+    const producerSats = netPoolSats - committeeSats
+    const posCoordinatorSats = Math.floor((netPoolSats * 5) / 100)
+    const posStakerSats = producerSats - posCoordinatorSats
+    const committeeSeatEach = fromSatoshi(Math.floor(committeeSats / ADAM_COMMITTEE_SIZE))
     return {
       subsidy: fromSatoshi(totalSats),
       treasury: fromSatoshi(treasurySats),
       netPool: fromSatoshi(netPoolSats),
       passiveMn: 0,
       producer: fromSatoshi(producerSats),
+      posStaker: fromSatoshi(posStakerSats),
+      posCoordinator: fromSatoshi(posCoordinatorSats),
       llmqTotal: 0,
       llmqPerSigner: 0,
+      llmqQuorumSize: 0,
       committeeTotal: fromSatoshi(committeeSats),
-      mnSeatEach: fromSatoshi(Math.floor(mnTrackSats / ADAM_MASTERNODE_TRACK_QUOTA)),
-      coinLockSeat: fromSatoshi(coinLockSats),
-      openPowSeatEach: fromSatoshi(Math.floor(openPowTrackSats / ADAM_OPEN_POW_TRACK_QUOTA))
+      committeeSeatEach,
+      mnSeatEach: committeeSeatEach,
+      coinLockSeat: committeeSeatEach,
+      openPowSeatEach: committeeSeatEach
     }
   }
 
+  // UPGRADE_FAIRNESS Model D: 35% Passive MN, 40% Equal-Pay Committee (11 seats), 15% Producer (PoS 12%+3%), 10% Signer-Only LLMQ
   const passiveMnSats = Math.floor((netPoolSats * 35) / 100)
   const committeeSats = Math.floor((netPoolSats * 40) / 100)
-  const producerSats = Math.floor((netPoolSats * 15) / 100)
-  const llmqSats = netPoolSats - passiveMnSats - committeeSats - producerSats
+  const llmqSats = Math.floor((netPoolSats * 10) / 100)
+  const producerSats = netPoolSats - passiveMnSats - committeeSats - llmqSats
+  const posCoordinatorSats = Math.floor((netPoolSats * 3) / 100)
+  const posStakerSats = producerSats - posCoordinatorSats
 
-  const mnTrackSats = Math.floor((netPoolSats * 20) / 100)
-  const coinLockSats = Math.floor((netPoolSats * 8) / 100)
-  const openPowTrackSats = committeeSats - mnTrackSats - coinLockSats
+  const llmqSpec = getDynamicLlmqSpec(activeMnCount)
+  const committeeSeatEach = fromSatoshi(Math.floor(committeeSats / ADAM_COMMITTEE_SIZE))
 
   return {
     subsidy: fromSatoshi(totalSats),
@@ -279,18 +286,23 @@ export function calculateModelDSplits(height: number, customSubsidy?: number) {
     netPool: fromSatoshi(netPoolSats),
     passiveMn: fromSatoshi(passiveMnSats),
     producer: fromSatoshi(producerSats),
+    posStaker: fromSatoshi(posStakerSats),
+    posCoordinator: fromSatoshi(posCoordinatorSats),
     llmqTotal: fromSatoshi(llmqSats),
-    llmqPerSigner: fromSatoshi(Math.floor(llmqSats / 5)),
+    llmqPerSigner: fromSatoshi(Math.floor(llmqSats / llmqSpec.size)),
+    llmqQuorumSize: llmqSpec.size,
     committeeTotal: fromSatoshi(committeeSats),
-    mnSeatEach: fromSatoshi(Math.floor(mnTrackSats / ADAM_MASTERNODE_TRACK_QUOTA)),
-    coinLockSeat: fromSatoshi(coinLockSats),
-    openPowSeatEach: fromSatoshi(Math.floor(openPowTrackSats / ADAM_OPEN_POW_TRACK_QUOTA))
+    committeeSeatEach,
+    mnSeatEach: committeeSeatEach,
+    coinLockSeat: committeeSeatEach,
+    openPowSeatEach: committeeSeatEach
   }
 }
 
 /**
- * Computes exact v1.5.7.0 Quadratic Stake-Weighted Coordinator VRF (`65 : 16 : 4`)
- * weights and election shares from current pool counts.
+ * Computes exact UPGRADE_FAIRNESS (ADAM_FAIR_COORD_V4, src/adam.cpp:2226-2269)
+ * proportional locked-capital Coordinator VRF weights (`4,200 : 250 : 10`) with
+ * zero per-track caps and an exact >= 75% Active MN floor when 3 * sumNonMN > sumMN.
  */
 export function calculateCoordinatorWeights(counts: {
   masternode?: number
@@ -298,33 +310,65 @@ export function calculateCoordinatorWeights(counts: {
   pow_lock?: number
 }): CoordinatorWeightSummary {
   const activeMnCount = Math.max(0, Math.floor(counts.masternode || 0))
-  const eligibleCoinLockSeats = Math.min(ADAM_COIN_LOCK_TRACK_QUOTA, Math.max(0, Math.floor(counts.coin_lock || 0)))
-  const eligiblePowLockSeats = Math.min(ADAM_OPEN_POW_TRACK_QUOTA, Math.max(0, Math.floor(counts.pow_lock || 0)))
+  const eligibleCoinLockSeats = Math.max(0, Math.floor(counts.coin_lock || 0))
+  const eligiblePowLockSeats = Math.max(0, Math.floor(counts.pow_lock || 0))
 
-  const totalMnWeight = activeMnCount * ADAM_COORD_WEIGHT_MASTERNODE
-  const totalCoinLockWeight = eligibleCoinLockSeats * ADAM_COORD_WEIGHT_COIN_LOCK
-  const totalPowLockWeight = eligiblePowLockSeats * ADAM_COORD_WEIGHT_POW_LOCK
-  const totalPoolWeight = totalMnWeight + totalCoinLockWeight + totalPowLockWeight
+  const sumMn = BigInt(activeMnCount) * BigInt(ADAM_COORD_WEIGHT_MASTERNODE)
+  const sumCl = BigInt(eligibleCoinLockSeats) * BigInt(ADAM_COORD_WEIGHT_COIN_LOCK)
+  const sumPl = BigInt(eligiblePowLockSeats) * BigInt(ADAM_COORD_WEIGHT_POW_LOCK)
+  const sumNonMn = sumCl + sumPl
 
-  const pct = (w: number) => (totalPoolWeight > 0 ? Math.round((w / totalPoolWeight) * 10000) / 100 : 0)
+  const mnFloorApplied = sumMn > 0n && sumNonMn > 0n && 3n * sumNonMn > sumMn
+
+  let totalMnScaled = sumMn
+  let totalClScaled = sumCl
+  let totalPlScaled = sumPl
+  let effectiveMnWeightEach = activeMnCount > 0 ? ADAM_COORD_WEIGHT_MASTERNODE : 0
+
+  if (mnFloorApplied) {
+    totalMnScaled = sumMn * 3n * sumNonMn
+    totalClScaled = sumCl * sumMn
+    totalPlScaled = sumPl * sumMn
+    effectiveMnWeightEach = Math.round(((3 * Number(sumNonMn)) / activeMnCount) * 100) / 100
+  }
+
+  const totalScaled = totalMnScaled + totalClScaled + totalPlScaled
+  const pctScaled = (part: bigint) => {
+    if (totalScaled <= 0n) return 0
+    const basisPoints = (part * 10000n + totalScaled / 2n) / totalScaled
+    return Number(basisPoints) / 100
+  }
+
+  const perSeatPct = (count: number, trackScaled: bigint) => {
+    if (count <= 0 || totalScaled <= 0n) return 0
+    const eachScaled = trackScaled / BigInt(count)
+    const basisPoints = (eachScaled * 10000n + totalScaled / 2n) / totalScaled
+    return Number(basisPoints) / 100
+  }
+
+  const totalMnWeight = activeMnCount * effectiveMnWeightEach
+  const totalCoinLockWeight = Number(sumCl)
+  const totalPowLockWeight = Number(sumPl)
 
   return {
     mnWeightEach: ADAM_COORD_WEIGHT_MASTERNODE,
+    effectiveMnWeightEach,
     coinLockWeightEach: ADAM_COORD_WEIGHT_COIN_LOCK,
     powLockWeightEach: ADAM_COORD_WEIGHT_POW_LOCK,
     activeMnCount,
     eligibleCoinLockSeats,
     eligiblePowLockSeats,
-    totalMnWeight,
+    totalMnWeight: Math.round(totalMnWeight * 100) / 100,
     totalCoinLockWeight,
     totalPowLockWeight,
-    totalPoolWeight,
-    mnSharePct: pct(totalMnWeight),
-    coinLockSharePct: pct(totalCoinLockWeight),
-    powLockSharePct: pct(totalPowLockWeight),
-    perMnSeatPct: activeMnCount > 0 ? pct(ADAM_COORD_WEIGHT_MASTERNODE) : 0,
-    perCoinLockSeatPct: eligibleCoinLockSeats > 0 ? pct(ADAM_COORD_WEIGHT_COIN_LOCK) : 0,
-    perPowLockSeatPct: eligiblePowLockSeats > 0 ? pct(ADAM_COORD_WEIGHT_POW_LOCK) : 0
+    totalPoolWeight: Math.round((totalMnWeight + totalCoinLockWeight + totalPowLockWeight) * 100) / 100,
+    mnSharePct: pctScaled(totalMnScaled),
+    coinLockSharePct: pctScaled(totalClScaled),
+    powLockSharePct: pctScaled(totalPlScaled),
+    perMnSeatPct: perSeatPct(activeMnCount, totalMnScaled),
+    perCoinLockSeatPct: perSeatPct(eligibleCoinLockSeats, totalClScaled),
+    perPowLockSeatPct: perSeatPct(eligiblePowLockSeats, totalPlScaled),
+    mnFloorApplied
   }
 }
 
@@ -370,4 +414,144 @@ export function maskPeerAddr(addr: string | null | undefined): string {
   }
 
   return 'peer.masked'
+}
+
+export interface RewardOutputClassificationInput {
+  n: number
+  address: string
+  amount: number
+}
+
+export interface RewardOutputClassificationContext {
+  height: number
+  isProofOfStake: boolean
+  adamCoordinator?: string | null
+  solvedCommitteeAddrs?: Set<string>
+  solvedSeatCount?: number
+  prevLlmqSignerAddrs?: Set<string>
+  activeMnCount?: number
+  treasuryAddress: string
+  isBurnAddress: (addr: string) => boolean
+}
+
+/**
+ * Classifies coinbase/coinstake vout entries according to C++ FillBlockPayee order and UPGRADE_FAIRNESS splits.
+ */
+export function classifyBlockRewardOutputs(
+  outputs: RewardOutputClassificationInput[],
+  ctx: RewardOutputClassificationContext
+): Array<RewardOutputClassificationInput & { role: string }> {
+  const positive = (outputs || []).filter((o) => (o.amount || 0) > 0)
+  if (positive.length === 0) return []
+
+  const splits = calculateModelDSplits(ctx.height, undefined, ctx.activeMnCount ?? 0)
+  const passiveMnSats = toSatoshi(splits.passiveMn)
+  const llmqSignerSats = toSatoshi(splits.llmqPerSigner)
+  const committeeSeatSats = toSatoshi(splits.committeeSeatEach)
+  const posCoordSats = toSatoshi(splits.posCoordinator)
+
+  const near = (sats: number, target: number, tol = 25) =>
+    target > 0 && Math.abs(sats - target) <= tol
+
+  // Count how many non-treasury, non-burn payouts exist after producer/staker in Model D vs Pre-Model D
+  const solvedCountHint = ctx.solvedSeatCount ?? (ctx.solvedCommitteeAddrs?.size || 0)
+  let remainingCommitteeSlots = solvedCountHint
+  let assignedPassiveMn = false
+  let assignedPosCoord = false
+
+  // Find last consensus payee index (before trailing Treasury & Protocol Burn outputs)
+  let lastConsensusIdx = -1
+  for (let i = positive.length - 1; i >= 0; i--) {
+    const addr = positive[i]!.address || ''
+    if (addr !== ctx.treasuryAddress && !ctx.isBurnAddress(addr)) {
+      lastConsensusIdx = i
+      break
+    }
+  }
+
+  return positive.map((out, idx) => {
+    const addr = out.address || ''
+    const sats = toSatoshi(out.amount)
+    let role = 'miner_reward'
+
+    if (ctx.isBurnAddress(addr)) {
+      return { ...out, role: 'protocol_burn' }
+    }
+    if (addr === ctx.treasuryAddress) {
+      return { ...out, role: 'treasury' }
+    }
+
+    if (ctx.height >= 5000) {
+      if (!ctx.isProofOfStake && out.n === 0) {
+        return { ...out, role: 'producer' }
+      }
+      if (ctx.isProofOfStake && out.n === 1) {
+        return { ...out, role: 'staker' }
+      }
+      if (
+        ctx.isProofOfStake &&
+        !assignedPosCoord &&
+        idx === lastConsensusIdx &&
+        (near(sats, posCoordSats, 5) || (Boolean(ctx.adamCoordinator) && addr === ctx.adamCoordinator))
+      ) {
+        assignedPosCoord = true
+        return { ...out, role: 'coordinator' }
+      }
+      if (!assignedPassiveMn && near(sats, passiveMnSats, 50)) {
+        assignedPassiveMn = true
+        return { ...out, role: 'masternode' }
+      }
+      if (
+        (ctx.prevLlmqSignerAddrs?.has(addr) && near(sats, llmqSignerSats, 50)) ||
+        (remainingCommitteeSlots === 0 && near(sats, llmqSignerSats, 50))
+      ) {
+        return { ...out, role: 'llmq' }
+      }
+      if (remainingCommitteeSlots > 0 && (near(sats, committeeSeatSats, 50) || ctx.solvedCommitteeAddrs?.has(addr))) {
+        remainingCommitteeSlots = Math.max(0, remainingCommitteeSlots - 1)
+        return { ...out, role: 'committee' }
+      }
+      if (ctx.prevLlmqSignerAddrs?.has(addr)) {
+        return { ...out, role: 'llmq' }
+      }
+      if (ctx.solvedCommitteeAddrs?.has(addr)) {
+        return { ...out, role: 'committee' }
+      }
+      if (ctx.isProofOfStake && !assignedPosCoord && near(sats, posCoordSats, 5)) {
+        assignedPosCoord = true
+        return { ...out, role: 'coordinator' }
+      }
+      role = !assignedPassiveMn ? 'masternode' : 'committee'
+      if (!assignedPassiveMn) assignedPassiveMn = true
+      return { ...out, role }
+    }
+
+    if (ctx.height >= 200) {
+      if (!ctx.isProofOfStake && out.n === 0) {
+        return { ...out, role: 'producer' }
+      }
+      if (ctx.isProofOfStake && out.n === 1) {
+        return { ...out, role: 'staker' }
+      }
+      if (
+        ctx.isProofOfStake &&
+        !assignedPosCoord &&
+        idx === lastConsensusIdx &&
+        (near(sats, posCoordSats, 5) || (Boolean(ctx.adamCoordinator) && addr === ctx.adamCoordinator))
+      ) {
+        assignedPosCoord = true
+        return { ...out, role: 'coordinator' }
+      }
+      if (ctx.solvedCommitteeAddrs?.has(addr) || near(sats, committeeSeatSats, 50)) {
+        return { ...out, role: 'committee' }
+      }
+      if (ctx.isProofOfStake && !assignedPosCoord && near(sats, posCoordSats, 5)) {
+        assignedPosCoord = true
+        return { ...out, role: 'coordinator' }
+      }
+      return { ...out, role: ctx.isProofOfStake ? 'staker' : 'producer' }
+    }
+
+    return { ...out, role }
+  })
 }

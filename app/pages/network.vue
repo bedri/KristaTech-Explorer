@@ -7,7 +7,7 @@ import { formatBytes, formatCoins, formatHashrate, formatNumber } from '~/utils/
 const { locale, t } = useI18n()
 const { data: net, refresh } = await useFetch('/api/network')
 
-const simHeight = ref(2200)
+const simHeight = ref(5000)
 const simSplits = computed(() => calculateModelDSplits(Math.max(0, Number(simHeight.value) || 0)))
 
 // Pure-SVG chart geometry for Block Intervals (Δt)
@@ -174,7 +174,7 @@ const volumeBars = computed(() => {
         <UIcon name="i-heroicons-rocket-launch" class="w-5 h-5 text-brand-salmon" aria-hidden="true" />
         {{ t('consensusRoadmap') }}
       </h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
           v-for="m in net.roadmap"
           :key="m.id"
@@ -223,7 +223,7 @@ const volumeBars = computed(() => {
             class="w-32 h-9 px-3 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 font-mono text-xs font-bold"
           />
           <button
-            v-for="preset in [100, 500, 2200, 3000, 6000, 10000]"
+            v-for="preset in [100, 500, 2500, 4800, 5000, 259202]"
             :key="preset"
             type="button"
             @click="simHeight = preset"
@@ -244,22 +244,34 @@ const volumeBars = computed(() => {
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.treasury, 4) }}</div>
         </div>
         <div class="p-3.5 rounded-xl bg-brand-blue/10 border border-brand-blue/20">
-          <div class="text-brand-blue font-semibold">Passive MN (35%)</div>
+          <div class="text-brand-blue font-semibold">Passive MN ({{ simHeight >= 5000 ? '35%' : '0%' }})</div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.passiveMn, 4) }}</div>
         </div>
         <div class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
-          <div class="text-purple-700 dark:text-purple-300 font-semibold">Producer / Coord</div>
+          <div class="text-purple-700 dark:text-purple-300 font-semibold">
+            Producer ({{ simHeight >= 5000 ? '15%' : simHeight >= 200 ? '25%' : '100%' }})
+          </div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.producer, 4) }}</div>
+          <div v-if="simHeight >= 200" class="text-[10px] text-slate-500 mt-0.5">
+            PoS: {{ simSplits.posStaker }} + {{ simSplits.posCoordinator }}
+          </div>
         </div>
         <div class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-          <div class="text-emerald-700 dark:text-emerald-300 font-semibold">LLMQ (5 × 2%)</div>
+          <div class="text-emerald-700 dark:text-emerald-300 font-semibold">
+            LLMQ ({{ simHeight >= 5000 ? '10%' : '0%' }})
+          </div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.llmqTotal, 4) }}</div>
+          <div v-if="simHeight >= 5000" class="text-[10px] text-slate-500 mt-0.5">
+            1-Blk Lag • {{ simSplits.llmqPerSigner }}/signer
+          </div>
         </div>
         <div class="p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
-          <div class="text-sky-700 dark:text-sky-300 font-semibold">11 Seat Pool (40%)</div>
+          <div class="text-sky-700 dark:text-sky-300 font-semibold">
+            11 Seat Pool ({{ simHeight >= 5000 ? '40%' : simHeight >= 200 ? '75%' : '0%' }})
+          </div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.committeeTotal, 4) }}</div>
           <div class="text-[10px] text-slate-500 mt-0.5">
-            MN: {{ simSplits.mnSeatEach }} • CL: {{ simSplits.coinLockSeat }} • PoW: {{ simSplits.openPowSeatEach }}
+            Equal Pay: {{ simSplits.committeeSeatEach }} / seat (1/11)
           </div>
         </div>
       </div>

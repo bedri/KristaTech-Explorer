@@ -69,17 +69,28 @@ function trackLabel(track) {
 }
 
 function rewardRoleLabel(role) {
+  const isPreModelD = (result.value?.block?.height || 0) < 5000
   switch (role) {
+    case 'staker':
+      return isPreModelD
+        ? t('roleStaker').replace('12%', '20%').replace('%12', '%20')
+        : t('roleStaker')
+    case 'coordinator':
+      return isPreModelD
+        ? t('roleCoordinator').replace('3%', '5%').replace('%3', '%5')
+        : t('roleCoordinator')
     case 'producer':
-      return (result.value?.block?.height || 0) < 2200
-        ? t('roleProducer').replace('15%', '60%').replace('%15', '%60')
+      return isPreModelD
+        ? t('roleProducer').replace('15%', '25%').replace('%15', '%25')
         : t('roleProducer')
     case 'masternode':
       return t('roleMasternode')
     case 'llmq':
       return t('roleLlmq')
     case 'committee':
-      return t('roleCommittee')
+      return isPreModelD
+        ? t('roleCommittee').replace('40%', '75%').replace('%40', '%75')
+        : t('roleCommittee')
     case 'treasury':
       return t('roleTreasury')
     case 'protocol_burn':
@@ -92,6 +103,8 @@ function rewardRoleLabel(role) {
 function rewardRoleClass(role) {
   switch (role) {
     case 'producer':
+    case 'staker':
+    case 'coordinator':
       return 'bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/20'
     case 'masternode':
       return 'bg-brand-blue/10 text-brand-blue border-brand-blue/20'
@@ -298,7 +311,7 @@ function copyToClipboard(text, label = 'Content') {
               {{ solvedSeatsCount }} / {{ committeeSeats.length }} {{ t('seatSolved') }}
             </span>
             <span class="px-2.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-xs font-semibold">
-              {{ result.block.height >= 2200 ? 'Model D (PoBLS + LLMQ)' : result.block.version >= 12 ? 'ADAM v2 (PoMBL)' : t('activeConsensus') }}
+              {{ result.block.height >= 5000 ? 'Model D / ADAM v2 (PoBLS + LLMQ)' : result.block.version >= 12 ? 'PoMBL (v12 17-Algo 3-Perm)' : t('activeConsensus') }}
             </span>
           </div>
         </div>

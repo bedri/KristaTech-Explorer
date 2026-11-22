@@ -81,32 +81,22 @@ export async function getValidatorPoolData() {
 
   const coordinatorVrf = calculateCoordinatorWeights(summary)
 
-  let seenCoinLock = 0
-  let seenPowLock = 0
-
   const validators = rawList.map((entry: any, idx: number) => {
     const track = String(entry?.track || 'bootstrap')
     const unlockHeight = typeof entry?.unlock_height === 'number' ? entry.unlock_height : 0
 
     let vrfTickets = 0
+    let vrfSeatPct = 0
     if (track === 'masternode') {
-      vrfTickets = ADAM_COORD_WEIGHT_MASTERNODE
+      vrfTickets = coordinatorVrf.effectiveMnWeightEach
+      vrfSeatPct = coordinatorVrf.perMnSeatPct
     } else if (track === 'coin_lock') {
-      if (seenCoinLock < ADAM_COIN_LOCK_TRACK_QUOTA) {
-        vrfTickets = ADAM_COORD_WEIGHT_COIN_LOCK
-      }
-      seenCoinLock++
+      vrfTickets = ADAM_COORD_WEIGHT_COIN_LOCK
+      vrfSeatPct = coordinatorVrf.perCoinLockSeatPct
     } else if (track === 'pow_lock') {
-      if (seenPowLock < ADAM_OPEN_POW_TRACK_QUOTA) {
-        vrfTickets = ADAM_COORD_WEIGHT_POW_LOCK
-      }
-      seenPowLock++
+      vrfTickets = ADAM_COORD_WEIGHT_POW_LOCK
+      vrfSeatPct = coordinatorVrf.perPowLockSeatPct
     }
-
-    const vrfSeatPct =
-      coordinatorVrf.totalPoolWeight > 0
-        ? Math.round((vrfTickets / coordinatorVrf.totalPoolWeight) * 10000) / 100
-        : 0
 
     return {
       index: typeof entry?.index === 'number' ? entry.index : idx,
@@ -130,7 +120,7 @@ export async function getValidatorPoolData() {
         seedHeight: qRes.seedHeight ?? 0,
         threshold: qRes.threshold ?? 3,
         developerFundAddress: qRes.developerFundAddress || '',
-        treasuryGovernanceStartHeight: qRes.treasuryGovernanceStartHeight ?? 2880,
+        treasuryGovernanceStartHeight: qRes.treasuryGovernanceStartHeight ?? 5000,
         members: Array.isArray(qRes.members)
           ? qRes.members.map((m: any, i: number) => ({
               rank: m.rank ?? i + 1,
@@ -156,6 +146,11 @@ export async function getValidatorPoolData() {
         addr: mn.addr || mn.address || '',
         status: mn.status || 'ENABLED',
         version: mn.version ?? 70983,
+        dip3: Boolean(mn.dip3),
+        proTxHash: mn.proTxHash || '',
+        registeredHeight: mn.registeredHeight ?? 0,
+        lastpaid: mn.lastpaid ?? 0,
+        pubkey: mn.pubkey || '',
         txhash: mn.txhash || '',
         outidx: mn.outidx ?? 0,
         lastseen: mn.lastseen || 0,
@@ -172,22 +167,22 @@ export async function getValidatorPoolData() {
       used: Math.min(ADAM_MASTERNODE_TRACK_QUOTA, summary.masternode),
       available: summary.masternode,
       max: ADAM_MASTERNODE_TRACK_QUOTA,
-      rewardShareNetPct: 20,
-      perSeatNetPct: 2.86
+      rewardShareNetPct: 25.45,
+      perSeatNetPct: 3.64
     },
     coinLock: {
       used: Math.min(ADAM_COIN_LOCK_TRACK_QUOTA, summary.coin_lock),
       available: summary.coin_lock,
       max: ADAM_COIN_LOCK_TRACK_QUOTA,
-      rewardShareNetPct: 8,
-      perSeatNetPct: 8.0
+      rewardShareNetPct: 3.64,
+      perSeatNetPct: 3.64
     },
     openPow: {
       used: Math.min(ADAM_OPEN_POW_TRACK_QUOTA, openPowAvailable),
       available: openPowAvailable,
       max: ADAM_OPEN_POW_TRACK_QUOTA,
-      rewardShareNetPct: 12,
-      perSeatNetPct: 4.0
+      rewardShareNetPct: 10.91,
+      perSeatNetPct: 3.64
     }
   }
 

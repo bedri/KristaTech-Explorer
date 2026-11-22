@@ -132,7 +132,7 @@ function trackLabel(track) {
           ></div>
         </div>
         <p class="text-xs text-slate-500 dark:text-slate-400">
-          Model D Net Pool: <strong>20.0%</strong> (~2.86% / seat) • <strong>65</strong> VRF tickets
+          Model D Net Pool: <strong>25.45%</strong> (Equal 3.64% / seat) • <strong>4,200</strong> VRF weight (KTDIP3)
         </p>
       </div>
 
@@ -155,7 +155,7 @@ function trackLabel(track) {
           ></div>
         </div>
         <p class="text-xs text-slate-500 dark:text-slate-400">
-          Model D Net Pool: <strong>8.0%</strong> (strictly isolated) • <strong>16</strong> VRF tickets (max 1)
+          Model D Net Pool: <strong>3.64%</strong> (Equal 40%/11 / seat) • <strong>250</strong> VRF weight (uncapped)
         </p>
       </div>
 
@@ -178,42 +178,50 @@ function trackLabel(track) {
           ></div>
         </div>
         <p class="text-xs text-slate-500 dark:text-slate-400">
-          Model D Net Pool: <strong>12.0%</strong> (4.00% / seat) • <strong>4</strong> VRF tickets each (max 3 = 12)
+          Model D Net Pool: <strong>10.91%</strong> (Equal 3.64% / seat; 2 Funded + 1 Open-Entry @ #2,500) • <strong>10</strong> VRF weight / Funded PoW-Lock
         </p>
       </div>
     </div>
 
-    <!-- 65 : 16 : 4 Quadratic Coordinator VRF Live Distribution -->
+    <!-- 4,200 : 250 : 10 Fair Capital Coordinator VRF Live Distribution -->
     <div v-if="valData?.coordinatorVrf" class="glass-card rounded-2xl p-6 space-y-4">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-2">
         <div>
-          <h2 class="text-lg font-bold text-slate-800 dark:text-white">{{ t('coordVrfTitle') }}</h2>
+          <h2 class="text-lg font-bold text-slate-800 dark:text-white flex flex-wrap items-center gap-2">
+            <span>{{ t('coordVrfTitle') }}</span>
+            <span
+              v-if="valData.coordinatorVrf.mnFloorApplied"
+              class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold"
+            >
+              {{ t('mnFloorBadge') }}
+            </span>
+          </h2>
           <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300">{{ t('coordVrfDesc') }}</p>
         </div>
         <span class="text-xs font-mono px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 font-semibold">
-          Total Pool Weight: {{ valData.coordinatorVrf.totalPoolWeight }} tickets
+          Total Pool Weight: {{ formatNumber(valData.coordinatorVrf.totalPoolWeight, 0) }}
         </span>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
         <div class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 flex justify-between items-center">
           <div>
-            <div class="font-bold text-purple-700 dark:text-purple-300">Masternode Track</div>
-            <div class="text-slate-600 dark:text-slate-300 mt-0.5">{{ valData.coordinatorVrf.totalMnWeight }} tickets ({{ valData.coordinatorVrf.perMnSeatPct }}% / MN)</div>
+            <div class="font-bold text-purple-700 dark:text-purple-300">Masternode Track (4,200 base)</div>
+            <div class="text-slate-600 dark:text-slate-300 mt-0.5">{{ formatNumber(valData.coordinatorVrf.totalMnWeight, 0) }} weight ({{ valData.coordinatorVrf.perMnSeatPct }}% / MN)</div>
           </div>
           <div class="text-lg font-extrabold text-purple-700 dark:text-purple-300">{{ valData.coordinatorVrf.mnSharePct }}%</div>
         </div>
         <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex justify-between items-center">
           <div>
-            <div class="font-bold text-amber-700 dark:text-amber-300">Coin-Lock Track (max 1)</div>
-            <div class="text-slate-600 dark:text-slate-300 mt-0.5">{{ valData.coordinatorVrf.totalCoinLockWeight }} tickets ({{ valData.coordinatorVrf.perCoinLockSeatPct }}% / rep)</div>
+            <div class="font-bold text-amber-700 dark:text-amber-300">Coin-Lock Track (250 weight)</div>
+            <div class="text-slate-600 dark:text-slate-300 mt-0.5">{{ formatNumber(valData.coordinatorVrf.totalCoinLockWeight, 0) }} weight ({{ valData.coordinatorVrf.perCoinLockSeatPct }}% / validator)</div>
           </div>
           <div class="text-lg font-extrabold text-amber-700 dark:text-amber-300">{{ valData.coordinatorVrf.coinLockSharePct }}%</div>
         </div>
         <div class="p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20 flex justify-between items-center">
           <div>
-            <div class="font-bold text-sky-700 dark:text-sky-300">Funded PoW-Lock (max 3)</div>
-            <div class="text-slate-600 dark:text-slate-300 mt-0.5">{{ valData.coordinatorVrf.totalPowLockWeight }} tickets ({{ valData.coordinatorVrf.perPowLockSeatPct }}% / rep)</div>
+            <div class="font-bold text-sky-700 dark:text-sky-300">Funded PoW-Lock (10 weight)</div>
+            <div class="text-slate-600 dark:text-slate-300 mt-0.5">{{ formatNumber(valData.coordinatorVrf.totalPowLockWeight, 0) }} weight ({{ valData.coordinatorVrf.perPowLockSeatPct }}% / validator)</div>
           </div>
           <div class="text-lg font-extrabold text-sky-700 dark:text-sky-300">{{ valData.coordinatorVrf.powLockSharePct }}%</div>
         </div>
@@ -457,8 +465,17 @@ function trackLabel(track) {
                     </NuxtLink>
                   </td>
                   <td class="p-3.5 font-mono text-xs">{{ mn.version }}</td>
-                  <td class="p-3.5 text-right">
-                    <span class="px-2 py-0.5 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 text-xs font-semibold">
+                  <td class="p-3.5 text-right space-x-1.5">
+                    <span
+                      v-if="mn.dip3"
+                      class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-700 dark:text-sky-300 text-xs font-semibold"
+                    >
+                      KTDIP3
+                    </span>
+                    <span
+                      class="px-2 py-0.5 rounded text-xs font-semibold"
+                      :class="mn.status === 'POSE_BANNED' ? 'bg-red-500/15 text-red-700 dark:text-red-300' : 'bg-purple-500/15 text-purple-700 dark:text-purple-300'"
+                    >
                       {{ mn.status }}
                     </span>
                   </td>

@@ -414,11 +414,11 @@ onUnmounted(() => {
             <div class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <span>KristaTech Blockchain Explorer</span>
               <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200/80 dark:bg-slate-900 border border-slate-300/60 dark:border-white/10 text-slate-700 dark:text-slate-300">
-                v1.5.7.0 • Proto 70983
+                v1.5.9.0 • Proto 70983
               </span>
             </div>
             <p class="text-xs text-slate-500 dark:text-slate-400">
-              Fair Launch • Zero Premine • ADAM Dual-Track (7 MN / 1 Coin-Lock / 3 Open PoW) • 65:16:4 Quadratic VRF
+              Fair Launch • Zero Premine • ADAM Dual-Track (7 MN / 1 Coin-Lock / 3 Open PoW) • 4,200:250:10 Fair VRF (≥75% MN Floor) • KTDIP3
             </p>
           </div>
 
@@ -438,7 +438,7 @@ onUnmounted(() => {
               Website ↗
             </a>
             <a
-              href="https://github.com/KristaTech/KRISTA"
+              href="https://github.com/bedri/KristaTech-KRISTA"
               target="_blank"
               rel="noopener noreferrer"
               class="hover:text-brand-salmon transition-colors"

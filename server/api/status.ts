@@ -43,19 +43,10 @@ export async function getBurnStats(indexedHeight: number) {
       [BURN_ADDRESSES[0], BURN_ADDRESSES[1]]
     )
 
-    const posFeeRow = await dbGet(
-      `
-      SELECT COALESCE(SUM(t.fee), 0) AS pos_fee_burn
-      FROM transactions t
-      JOIN blocks b ON t.block_hash = b.hash
-      WHERE b.is_pos = 1 AND t.is_coinbase = 0 AND t.is_coinstake = 0 AND t.fee > 0
-    `
-    )
-
     const protocolOutSats = Math.round((burnOutputsRow?.protocol_out_burn || 0) * 1e8)
     const voluntarySats = Math.round((burnOutputsRow?.voluntary_out_burn || 0) * 1e8)
-    const posFeeSats = Math.round((posFeeRow?.pos_fee_burn || 0) * 1e8)
-    const protocolSats = protocolOutSats + posFeeSats
+    // UPGRADE_FAIRNESS (Block 1): 100% of PoS tx fees are paid symmetrically to the Staker (not burned).
+    const protocolSats = protocolOutSats
     const totalSats = protocolSats + voluntarySats
     const ktBurnOutSats = protocolOutSats + voluntarySats
 

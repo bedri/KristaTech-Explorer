@@ -10,6 +10,8 @@ import {
   buildConsensusInfo,
   calculateModelDSplits,
   calculateCoordinatorWeights,
+  getDynamicLlmqSpec,
+  classifyBlockRewardOutputs,
   detectSearchQueryType,
   maskPeerAddr
 } from '../app/utils/protocol.ts'
@@ -51,83 +53,162 @@ function listFilesRecursive(dir: string, ext: string): string[] {
   return out
 }
 
-describe('KristaTech Protocol & Tokenomics Math (v1.5.7.0 / 70983)', () => {
+describe('KristaTech Protocol & Tokenomics Math (v1.5.9.0 / 70983)', () => {
   it('computes exact C++ CMasternode::GetBlockValue subsidy schedule', () => {
     assert.equal(calculateBlockSubsidy(0), 0)
     assert.equal(calculateBlockSubsidy(1), 0)
-    assert.equal(calculateBlockSubsidy(2), 40)
-    assert.equal(calculateBlockSubsidy(2200), 40)
-    assert.equal(calculateBlockSubsidy(2201), 30)
-    assert.equal(calculateBlockSubsidy(5000), 30)
-    assert.equal(calculateBlockSubsidy(5001), 20)
-    assert.equal(calculateBlockSubsidy(9999), 20)
-    assert.equal(calculateBlockSubsidy(10000), 15)
-    // First quarterly 1.9% geometric decay at height 10,000 + 259,200 = 269,200: 15 * 0.981 = 14.715
-    assert.equal(calculateBlockSubsidy(269200), 14.715)
+    assert.equal(calculateBlockSubsidy(2), 17)
+    assert.equal(calculateBlockSubsidy(4800), 17)
+    assert.equal(calculateBlockSubsidy(5000), 17)
+    assert.equal(calculateBlockSubsidy(259201), 17)
+    // First quarterly 2.15% geometric decay at height 2 + 259,200 = 259,202: 17 * 0.9785 = 16.6345
+    assert.equal(calculateBlockSubsidy(259202), 16.6345)
   })
 
-  it('computes exact cumulative theoretical block supply across all bootstrap epochs', () => {
+  it('computes exact cumulative theoretical block supply across all epochs', () => {
     assert.equal(calculateTotalSupply(0), 0)
     assert.equal(calculateTotalSupply(1), 0)
-    // Blocks 2..2200 = 2,199 blocks * 40 = 87,960 KRISTA
-    assert.equal(calculateTotalSupply(2200), 87960)
-    // Blocks 2201..5000 = 2,800 blocks * 30 = 84,000 -> 87,960 + 84,000 = 171,960 KRISTA
-    assert.equal(calculateTotalSupply(5000), 171960)
-    // Blocks 5001..9999 = 4,999 blocks * 20 = 99,980 -> 171,960 + 99,980 = 271,940 KRISTA
-    assert.equal(calculateTotalSupply(9999), 271940)
-    // Block 10000 adds 15 -> 271,955 KRISTA
-    assert.equal(calculateTotalSupply(10000), 271955)
+    // Block 2..4800 = 4,799 blocks * 17 = 81,583 KRISTA
+    assert.equal(calculateTotalSupply(4800), 81583)
+    // Block 2..5000 = 4,999 blocks * 17 = 84,983 KRISTA
+    assert.equal(calculateTotalSupply(5000), 84983)
+    // Period 0 (Blocks 2..259201 = 259,200 blocks * 17) = 4,406,400 KRISTA
+    assert.equal(calculateTotalSupply(259201), 4406400)
+    // Block 259202 adds Period 1 reward 16.6345 -> 4,406,416.6345 KRISTA
+    assert.equal(calculateTotalSupply(259202), 4406416.6345)
   })
 
-  it('computes exact Model D reward splits (7% Treasury + 93% Net Pool -> 35/40/15/10)', () => {
-    // At Block 2200, gross subsidy is still 40 KRISTA
-    const split2200 = calculateModelDSplits(2200)
-    assert.equal(split2200.subsidy, 40)
-    assert.equal(split2200.treasury, 2.8)
-    assert.equal(split2200.netPool, 37.2)
-    assert.equal(split2200.passiveMn, 13.02) // 35% of 37.2
-    assert.equal(split2200.committeeTotal, 14.88) // 40% of 37.2
-    assert.equal(split2200.producer, 5.58) // 15% of 37.2
-    assert.equal(split2200.llmqTotal, 3.72) // 10% of 37.2
-    assert.equal(split2200.llmqPerSigner, 0.744) // 2% of 37.2 each across 5 signers
-    assert.equal(split2200.coinLockSeat, 2.976) // 8% of 37.2
-    assert.equal(split2200.openPowSeatEach, 1.488) // 4% of 37.2 each across 3 Open PoW seats
+  it('computes exact UPGRADE_FAIRNESS Model D & Pre-Model D splits (Equal-Pay & Dynamic LLMQ)', () => {
+    // At Block 5000, gross subsidy is 17 KRISTA, 7% treasury = 1.19, 93% net = 15.81
+    const split5000 = calculateModelDSplits(5000)
+    assert.equal(split5000.subsidy, 17)
+    assert.equal(split5000.treasury, 1.19)
+    assert.equal(split5000.netPool, 15.81)
+    assert.equal(split5000.passiveMn, 5.5335) // 35% of 15.81
+    assert.equal(split5000.committeeTotal, 6.324) // 40% of 15.81
+    assert.equal(split5000.producer, 2.3715) // 15% of 15.81 (PoW)
+    assert.equal(split5000.posStaker, 1.8972) // 12% of 15.81 (PoS Staker)
+    assert.equal(split5000.posCoordinator, 0.4743) // 3% of 15.81 (PoS Signing Coordinator)
+    assert.equal(split5000.llmqTotal, 1.581) // 10% of 15.81
+    assert.equal(split5000.llmqQuorumSize, 5)
+    assert.equal(split5000.llmqPerSigner, 0.3162) // 15.81 * 10% / 5 signers
+    assert.equal(split5000.committeeSeatEach, 0.57490909) // Equal Work -> Equal Pay (40% / 11)
+    assert.equal(split5000.mnSeatEach, 0.57490909)
+    assert.equal(split5000.coinLockSeat, 0.57490909)
+    assert.equal(split5000.openPowSeatEach, 0.57490909)
 
-    // Pre-Model D Dual-Track split (e.g., Block 1000: 60% producer / 40% committee)
+    // Dynamic LLMQ scaling across MN counts
+    assert.deepEqual(getDynamicLlmqSpec(4), { size: 5, threshold: 3 })
+    assert.deepEqual(getDynamicLlmqSpec(25), { size: 9, threshold: 5 })
+    assert.deepEqual(getDynamicLlmqSpec(50), { size: 11, threshold: 6 })
+    assert.deepEqual(getDynamicLlmqSpec(100), { size: 15, threshold: 8 })
+    assert.equal(calculateModelDSplits(5000, 17, 100).llmqPerSigner, 0.1054)
+
+    // Pre-Model D UPGRADE_FAIRNESS split (Block 1000: 25% producer [20%+5% PoS] / 75% equal-pay committee)
     const split1000 = calculateModelDSplits(1000)
-    assert.equal(split1000.treasury, 2.8)
+    assert.equal(split1000.treasury, 1.19)
     assert.equal(split1000.passiveMn, 0)
-    assert.equal(split1000.producer, 22.32)
-    assert.equal(split1000.committeeTotal, 14.88)
+    assert.equal(split1000.producer, 3.9525)
+    assert.equal(split1000.posStaker, 3.162)
+    assert.equal(split1000.posCoordinator, 0.7905)
+    assert.equal(split1000.committeeTotal, 11.8575)
+    assert.equal(split1000.committeeSeatEach, 1.07795454)
   })
 
-  it('computes Quadratic Stake-Weighted Coordinator VRF (65 : 16 : 4) with strict track quotas', () => {
-    const weights = calculateCoordinatorWeights({
+  it('computes ADAM_FAIR_COORD_V4 proportional capital Coordinator VRF (4,200 : 250 : 10) with >=75% MN floor', () => {
+    // Unfloored case: 5 MNs = 21,000 vs 4 CL + 6 PL = 1,060 -> 3 * 1,060 = 3,180 <= 21,000
+    const unfloored = calculateCoordinatorWeights({
       masternode: 5,
-      coin_lock: 4, // strictly capped to 1 eligible seat
-      pow_lock: 6 // strictly capped to 3 eligible seats
+      coin_lock: 4,
+      pow_lock: 6
     })
-    assert.equal(weights.activeMnCount, 5)
-    assert.equal(weights.eligibleCoinLockSeats, 1)
-    assert.equal(weights.eligiblePowLockSeats, 3)
-    assert.equal(weights.totalMnWeight, 325) // 5 * 65
-    assert.equal(weights.totalCoinLockWeight, 16) // 1 * 16
-    assert.equal(weights.totalPowLockWeight, 12) // 3 * 4
-    assert.equal(weights.totalPoolWeight, 353)
+    assert.equal(unfloored.mnFloorApplied, false)
+    assert.equal(unfloored.activeMnCount, 5)
+    assert.equal(unfloored.eligibleCoinLockSeats, 4)
+    assert.equal(unfloored.eligiblePowLockSeats, 6)
+    assert.equal(unfloored.totalMnWeight, 21000)
+    assert.equal(unfloored.totalCoinLockWeight, 1000)
+    assert.equal(unfloored.totalPowLockWeight, 60)
+    assert.equal(unfloored.totalPoolWeight, 22060)
+    assert.equal(unfloored.mnSharePct, 95.19)
+
+    // Floored case: 1 MN = 4,200 vs 20 CL (5,000) + 100 PL (1,000) = 6,000 non-MN -> 3 * 6,000 > 4,200 -> 75% floor
+    const floored = calculateCoordinatorWeights({
+      masternode: 1,
+      coin_lock: 20,
+      pow_lock: 100
+    })
+    assert.equal(floored.mnFloorApplied, true)
+    assert.equal(floored.mnSharePct, 75)
+    assert.equal(floored.coinLockSharePct, 20.83)
+    assert.equal(floored.powLockSharePct, 4.17)
   })
 
   it('maps consensus eras and milestones accurately across height transitions', () => {
     assert.equal(buildConsensusInfo(50).nextHeight, 200)
-    assert.equal(buildConsensusInfo(500).currentEra, 'ADAM v1')
-    assert.equal(buildConsensusInfo(800).currentEra, 'ADAM v1.2 (Dual-Track)')
-    assert.equal(buildConsensusInfo(2100).currentEra, 'ADAM v2 (PoMBL)')
-    assert.equal(buildConsensusInfo(2500).currentEra, 'Model D (PoBLS + LLMQ)')
-    assert.equal(buildConsensusInfo(12000).currentEra, 'Model D • Epoch #1')
+    assert.equal(buildConsensusInfo(500).currentEra, 'ADAM Dual-Track (Pre-Model D)')
+    assert.equal(buildConsensusInfo(500).nextHeight, 2500)
+    assert.equal(buildConsensusInfo(3000).currentEra, 'ADAM Dual-Track • Open-Entry Active')
+    assert.equal(buildConsensusInfo(3000).nextHeight, 4800)
+    assert.equal(buildConsensusInfo(4900).currentEra, 'PoMBL (Block v12)')
+    assert.equal(buildConsensusInfo(5000).currentEra, 'Model D (PoBLS + Dynamic LLMQ)')
+    assert.equal(buildConsensusInfo(260000).currentEra, 'Model D • Epoch #2')
+  })
+
+  it('classifies PoS/PoW Model D & Pre-Model D block reward outputs including 1-block lag LLMQ and PoS Coordinator', () => {
+    const classifiedModelD = classifyBlockRewardOutputs(
+      [
+        { n: 1, address: 'KTStakerAddr', amount: 1.8972 },
+        { n: 2, address: 'KTPassiveMnAddr', amount: 5.5335 },
+        { n: 3, address: 'KTPrevLlmqSigner1', amount: 0.3162 },
+        { n: 4, address: 'KTSeat1Addr', amount: 0.57490909 },
+        { n: 5, address: 'KTCoordAddr', amount: 0.4743 },
+        { n: 6, address: TREASURY_ADDRESS, amount: 1.19 },
+        { n: 7, address: BURN_ADDRESSES[0]!, amount: 3.5 }
+      ],
+      {
+        height: 5000,
+        isProofOfStake: true,
+        adamCoordinator: 'KTCoordAddr',
+        solvedCommitteeAddrs: new Set(['KTSeat1Addr']),
+        solvedSeatCount: 1,
+        prevLlmqSignerAddrs: new Set(['KTPrevLlmqSigner1']),
+        activeMnCount: 5,
+        treasuryAddress: TREASURY_ADDRESS,
+        isBurnAddress
+      }
+    )
+    assert.deepEqual(
+      classifiedModelD.map((o) => o.role),
+      ['staker', 'masternode', 'llmq', 'committee', 'coordinator', 'treasury', 'protocol_burn']
+    )
+
+    const classifiedPreModelD = classifyBlockRewardOutputs(
+      [
+        { n: 1, address: 'KTStakerAddr', amount: 3.162 },
+        { n: 2, address: 'KTSeat1Addr', amount: 1.07795454 },
+        { n: 3, address: 'KTCoordAddr', amount: 0.7905 },
+        { n: 4, address: TREASURY_ADDRESS, amount: 1.19 }
+      ],
+      {
+        height: 1000,
+        isProofOfStake: true,
+        adamCoordinator: 'KTCoordAddr',
+        solvedCommitteeAddrs: new Set(['KTSeat1Addr']),
+        solvedSeatCount: 1,
+        treasuryAddress: TREASURY_ADDRESS,
+        isBurnAddress
+      }
+    )
+    assert.deepEqual(
+      classifiedPreModelD.map((o) => o.role),
+      ['staker', 'committee', 'coordinator', 'treasury']
+    )
   })
 
   it('detects smart search query types accurately', () => {
     assert.equal(detectSearchQueryType(''), 'empty')
-    assert.equal(detectSearchQueryType('2200'), 'height')
+    assert.equal(detectSearchQueryType('5000'), 'height')
     assert.equal(detectSearchQueryType('a'.repeat(64)), 'hash')
     assert.equal(detectSearchQueryType('02' + 'b'.repeat(64)), 'pubkey')
     assert.equal(detectSearchQueryType('03' + 'c'.repeat(64)), 'pubkey')

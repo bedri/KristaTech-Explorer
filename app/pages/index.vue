@@ -194,7 +194,7 @@ const nextMilestoneLabel = computed(() => {
         </div>
       </NuxtLink>
 
-      <!-- Card 6: Active Validator Pool & 65:16:4 VRF -->
+      <!-- Card 6: Active Validator Pool & 4,200:250:10 Fair VRF -->
       <NuxtLink to="/validators" class="glass-card rounded-xl p-5 relative overflow-hidden group block">
         <div class="flex items-center gap-4">
           <div class="p-3 bg-purple-500/10 rounded-lg text-purple-500">

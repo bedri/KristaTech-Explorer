@@ -1,51 +1,13 @@
 import { callRpc } from '../../utils/rpc'
 import { dbGet, dbQuery, isBurnAddress, TREASURY_ADDRESS } from '../../utils/db'
 import { getValidatorPoolData } from '../validators'
-import { calculateBlockSubsidy } from '../../../app/utils/protocol'
+import {
+  calculateBlockSubsidy,
+  classifyBlockRewardOutputs
+} from '../../../app/utils/protocol'
 
 function normalizeAmount(val: number | null | undefined): number {
   return Math.round((val || 0) * 1e8) / 1e8
-}
-
-function classifyRewardOutput(
-  out: any,
-  block: any,
-  solvedCommitteeAddrs: Set<string>,
-  llmqSignerAddrs: Set<string>
-): string {
-  const addr = out.address || ''
-  if (isBurnAddress(addr)) return 'protocol_burn'
-  if (addr === TREASURY_ADDRESS) return 'treasury'
-
-  if (block.height >= 2200) {
-    if ((!block.isProofOfStake && out.n === 0) || (block.isProofOfStake && out.n === 1)) {
-      return 'producer'
-    }
-    if (block.adamCoordinator && addr === block.adamCoordinator && out.n <= 2) {
-      return 'producer'
-    }
-    if (llmqSignerAddrs.has(addr)) {
-      return 'llmq'
-    }
-    if (solvedCommitteeAddrs.has(addr)) {
-      return 'committee'
-    }
-    return 'masternode'
-  }
-
-  if (block.height >= 200) {
-    if ((!block.isProofOfStake && out.n === 0) || (block.isProofOfStake && out.n === 1)) {
-      return 'producer'
-    }
-    if (block.adamCoordinator && addr === block.adamCoordinator && out.n <= 2) {
-      return 'producer'
-    }
-    if (solvedCommitteeAddrs.has(addr)) {
-      return 'committee'
-    }
-  }
-
-  return 'miner_reward'
 }
 
 export default defineEventHandler(async (event) => {
@@ -147,18 +109,59 @@ export default defineEventHandler(async (event) => {
         }
       }
 
-      const llmqSignerAddrs = new Set<string>(
-        Array.isArray(block.adamQuorumSigners?.signers) ? block.adamQuorumSigners.signers : []
-      )
+      // Under UPGRADE_FAIRNESS (Height 1), Model D 10% LLMQ rewards in block H pay prevBlock (H-1) signers (1-block lag).
+      const prevLlmqSignerAddrs = new Set<string>()
+      if (block.height >= 5000) {
+        try {
+          const prevQuorumRow = await dbGet('SELECT adam_quorum_signers FROM blocks WHERE height = ?', [
+            block.height - 1
+          ])
+          if (prevQuorumRow?.adam_quorum_signers) {
+            const parsedPrev = JSON.parse(prevQuorumRow.adam_quorum_signers)
+            if (Array.isArray(parsedPrev?.signers)) {
+              for (const s of parsedPrev.signers) prevLlmqSignerAddrs.add(String(s))
+            }
+          } else if (block.previousblockhash) {
+            const prevBlockRpc = await callRpc('getblock', [block.previousblockhash, true])
+            if (Array.isArray(prevBlockRpc?.adamQuorumSigners?.signers)) {
+              for (const s of prevBlockRpc.adamQuorumSigners.signers) prevLlmqSignerAddrs.add(String(s))
+            }
+          }
+        } catch (_) {}
+      }
+      if (prevLlmqSignerAddrs.size === 0 && Array.isArray(block.adamQuorumSigners?.signers)) {
+        for (const s of block.adamQuorumSigners.signers) prevLlmqSignerAddrs.add(String(s))
+      }
 
-      rewardOutputs = (rawRewardOuts || [])
+      let activeMnCount = 0
+      try {
+        const pool = await getValidatorPoolData()
+        activeMnCount = pool?.summary?.masternode || 0
+      } catch (_) {}
+
+      const positiveOuts = (rawRewardOuts || [])
         .filter((o: any) => (o.amount || 0) > 0)
         .map((o: any) => ({
           n: o.n,
           address: o.address,
-          amount: normalizeAmount(o.amount),
-          role: classifyRewardOutput(o, block, solvedCommitteeAddrs, llmqSignerAddrs)
+          amount: normalizeAmount(o.amount)
         }))
+
+      const solvedCount = Array.isArray(block.vAdamSolutions)
+        ? block.vAdamSolutions.filter((s: any) => Boolean(s) && String(s).length > 0).length
+        : solvedCommitteeAddrs.size
+
+      rewardOutputs = classifyBlockRewardOutputs(positiveOuts, {
+        height: block.height,
+        isProofOfStake: Boolean(block.isProofOfStake),
+        adamCoordinator: block.adamCoordinator || null,
+        solvedCommitteeAddrs,
+        solvedSeatCount: solvedCount,
+        prevLlmqSignerAddrs,
+        activeMnCount,
+        treasuryAddress: TREASURY_ADDRESS,
+        isBurnAddress
+      })
     }
 
     const totalFees = Math.round(totalFeesSats) / 1e8

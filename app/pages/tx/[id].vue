@@ -225,6 +225,9 @@ function isClickableAddress(addr) {
                     <span v-else-if="output.script_type === 'adam_powlock'" class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-700 dark:text-sky-300 text-[11px] font-semibold">
                       ⚡ {{ t('powLockBadge') }}
                     </span>
+                    <span v-else-if="output.script_type === 'cltv_timelock'" class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
+                      ⏳ {{ t('polTimelockBadge') }}
+                    </span>
                     <span v-else-if="output.script_type === 'witness_v1_taproot' || output.script_type === 'mescalcontract'" class="px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold">
                       📜 {{ t('taprootContract') }}
                     </span>
