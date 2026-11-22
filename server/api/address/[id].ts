@@ -5,6 +5,7 @@ import {
   normalizeTaprootAddress,
   TREASURY_ADDRESS
 } from '../../utils/db'
+import { setCacheControl } from '../../utils/api'
 import { getValidatorPoolData } from '../validators'
 import { calculateBlockSubsidy } from '../../../app/utils/protocol'
 
@@ -198,6 +199,8 @@ export default defineEventHandler(async (event) => {
       solvedSeats: b.solved_seats || 0,
       isCoordinator: b.adam_coordinator === address
     }))
+
+    setCacheControl(event, 5, 5)
 
     return {
       success: true,

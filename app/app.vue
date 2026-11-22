@@ -153,6 +153,7 @@ function handleGlobalKeydown(e) {
 }
 
 let tickerInterval = null
+let eventSource = null
 onMounted(() => {
   window.addEventListener('click', closeDropdown)
   window.addEventListener('keydown', handleGlobalKeydown)
@@ -165,15 +166,35 @@ onMounted(() => {
     }
   }
 
+  let pollMs = 10000
+  if (typeof EventSource !== 'undefined') {
+    try {
+      eventSource = new EventSource('/api/events?topics=block,mempool')
+      pollMs = 30000
+      eventSource.addEventListener('block', () => {
+        refreshLiveStatus()
+      })
+      eventSource.addEventListener('mempool', () => {
+        refreshLiveStatus()
+      })
+    } catch (_) {
+      pollMs = 10000
+    }
+  }
+
   tickerInterval = setInterval(() => {
     refreshLiveStatus()
-  }, 10000)
+  }, pollMs)
 })
 
 onUnmounted(() => {
   window.removeEventListener('click', closeDropdown)
   window.removeEventListener('keydown', handleGlobalKeydown)
   if (tickerInterval) clearInterval(tickerInterval)
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
 })
 </script>
 

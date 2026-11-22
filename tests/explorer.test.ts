@@ -33,7 +33,29 @@ import {
   BURN_ADDRESSES,
   TREASURY_ADDRESS
 } from '../server/utils/db.ts'
-import { ALLOWED_RPC_METHODS, assertAllowedRpcMethod } from '../server/utils/rpc.ts'
+import {
+  ALLOWED_RPC_METHODS,
+  assertAllowedRpcMethod,
+  isTxBroadcastEnabled,
+  MAX_RAW_TX_HEX_LENGTH,
+  validateRawTxHex
+} from '../server/utils/rpc.ts'
+import {
+  BoundedTtlCache,
+  isValidAddressParam,
+  isValidCompressedPubkey,
+  isValidTxid,
+  parsePagination
+} from '../server/utils/api.ts'
+import { computeFeeEstimates } from '../server/utils/fees.ts'
+import { computeValidatorWindowStats } from '../server/utils/validatorStats.ts'
+import {
+  parseTopicsParam,
+  publishExplorerEvent,
+  registerSseClient,
+  resetSseHubForTests
+} from '../server/utils/events.ts'
+import { buildOpenApiSpec } from '../server/utils/openapi.ts'
 import { explorerTranslations, translateKey } from '../app/composables/useI18n.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -384,7 +406,203 @@ describe('Static Security & Accessibility Audit (Vue + Nitro Server)', () => {
 
     assert.doesNotThrow(() => assertAllowedRpcMethod('spork', ['show']))
     assert.doesNotThrow(() => assertAllowedRpcMethod('spork', ['active']))
+    assert.doesNotThrow(() => assertAllowedRpcMethod('estimatesmartfee', [1]))
+    assert.doesNotThrow(() => assertAllowedRpcMethod('decoderawtransaction', ['deadbeef']))
+    assert.equal(ALLOWED_RPC_METHODS.has('sendrawtransaction'), false)
     assert.throws(() => assertAllowedRpcMethod('sendtoaddress', []))
+    assert.throws(() => assertAllowedRpcMethod('sendrawtransaction', []))
     assert.throws(() => assertAllowedRpcMethod('spork', ['SPORK_2_INSTANTSEND_ENABLED', 0]))
+  })
+})
+
+describe('API v2.1 Utilities, Validation, Caching, Fees, Validator Stats, SSE & OpenAPI', () => {
+  it('validates addresses, txids, compressed pubkeys, pagination, and BoundedTtlCache', async () => {
+    assert.equal(isValidAddressParam(TREASURY_ADDRESS), true)
+    assert.equal(isValidAddressParam('kt1p' + 'q'.repeat(58)), true)
+    assert.equal(isValidAddressParam('invalid!addr'), false)
+    assert.equal(isValidTxid('a'.repeat(64)), true)
+    assert.equal(isValidTxid('g'.repeat(64)), false)
+    assert.equal(isValidCompressedPubkey('02' + 'f'.repeat(64)), true)
+    assert.equal(isValidCompressedPubkey('04' + 'f'.repeat(64)), false)
+
+    assert.deepEqual(parsePagination({ page: '-5', limit: '999' }, { maxLimit: 100 }), {
+      page: 1,
+      limit: 100,
+      offset: 0
+    })
+    assert.deepEqual(parsePagination({ page: '3', limit: '20' }), {
+      page: 3,
+      limit: 20,
+      offset: 40
+    })
+
+    const cache = new BoundedTtlCache<number>(50, 2)
+    cache.set('a', 1)
+    cache.set('b', 2)
+    cache.set('c', 3)
+    assert.equal(cache.size, 2)
+    assert.equal(cache.get('a'), undefined)
+    assert.equal(cache.get('c'), 3)
+
+    let calls = 0
+    const [r1, r2] = await Promise.all([
+      cache.getOrLoad('shared', async () => {
+        calls++
+        await new Promise((r) => setTimeout(r, 10))
+        return 42
+      }),
+      cache.getOrLoad('shared', async () => {
+        calls++
+        return 99
+      })
+    ])
+    assert.equal(calls, 1)
+    assert.equal(r1, 42)
+    assert.equal(r2, 42)
+  })
+
+  it('validates raw transaction hex and defaults broadcast toggle to disabled', () => {
+    assert.equal(isTxBroadcastEnabled({}), false)
+    assert.equal(isTxBroadcastEnabled({ enableTxBroadcast: 'false' }), false)
+    assert.equal(isTxBroadcastEnabled({ enableTxBroadcast: 'true' }), true)
+
+    assert.equal(validateRawTxHex('').valid, false)
+    assert.equal(validateRawTxHex('0102').valid, false) // too short
+    assert.equal(validateRawTxHex('0'.repeat(21)).valid, false) // odd length
+    assert.equal(validateRawTxHex('zz'.repeat(20)).valid, false) // non-hex
+    assert.equal(validateRawTxHex('a'.repeat(MAX_RAW_TX_HEX_LENGTH + 2)).valid, false)
+
+    const ok = validateRawTxHex('  0100000001' + 'aa'.repeat(30) + '  ')
+    assert.equal(ok.valid, true)
+    assert.equal(ok.byteLength, 35)
+  })
+
+  it('computes monotonic fee tiers with relayfee fallback when estimatesmartfee returns -1', () => {
+    const fallback = computeFeeEstimates({
+      smartFeeFast: { feerate: -1, blocks: 25 },
+      smartFeeStandard: { feerate: -1, blocks: 25 },
+      smartFeeEconomy: { feerate: -1, blocks: 25 },
+      relayFeeKristaPerKb: 0.0001,
+      feeInfo20: {
+        'Starting block': 680,
+        'Ending block': 699,
+        txcount: 3,
+        txcount_all: 23,
+        txbytes: 750,
+        ttlfee: '0.003',
+        feeperkb: '0.004'
+      }
+    })
+    assert.equal(fallback.source, 'relayfee_fallback')
+    assert.equal(fallback.minRelay.satPerByte, 10)
+    assert.equal(fallback.tiers.economy.satPerByte, 10)
+    assert.ok(fallback.tiers.fast.satPerByte >= fallback.tiers.standard.satPerByte)
+    assert.ok(fallback.tiers.standard.satPerByte >= fallback.tiers.economy.satPerByte)
+    assert.equal(fallback.recent20Blocks?.txCount, 3)
+
+    const smart = computeFeeEstimates({
+      smartFeeFast: { feerate: 0.0005 },
+      smartFeeStandard: { feerate: 0.00025 },
+      smartFeeEconomy: { feerate: 0.00012 },
+      relayFeeKristaPerKb: 0.0001
+    })
+    assert.equal(smart.source, 'estimatesmartfee')
+    assert.equal(smart.tiers.fast.satPerByte, 50)
+    assert.equal(smart.tiers.standard.satPerByte, 25)
+    assert.equal(smart.tiers.economy.satPerByte, 12)
+  })
+
+  it('computes validator window statistics with 11+1 vAdamMiners alignment', () => {
+    const target = 'KValAddr1'
+    const miners12 = [target, 'KOther1', 'KOther2', 'KOther3', 'KOther4', 'KOther5', 'KOther6', 'KOther7', 'KOther8', 'KOther9', 'KOther10', 'KCoordSlot']
+    const stats = computeValidatorWindowStats(target, [
+      {
+        height: 5002,
+        hash: 'h5002',
+        time: 1700000060,
+        is_pos: 1,
+        adam_coordinator: target,
+        producer_address: target,
+        adam_miners: JSON.stringify(miners12),
+        adam_solutions: JSON.stringify(['sol0', '', '', '', '', '', '', '', '', '', '']),
+        adam_quorum_signers: JSON.stringify({ signers: [target, 'KOther1'] })
+      },
+      {
+        height: 5001,
+        hash: 'h5001',
+        time: 1700000030,
+        is_pos: 0,
+        adam_coordinator: 'KOther1',
+        producer_address: 'KOther1',
+        adam_miners: JSON.stringify(['KOther1', target]),
+        adam_solutions: JSON.stringify(['sol0', '']),
+        adam_quorum_signers: JSON.stringify({ signers: ['KOther1'] })
+      }
+    ])
+
+    assert.equal(stats.blocksEvaluated, 2)
+    assert.equal(stats.committeeSelections, 2)
+    assert.equal(stats.seatsSolved, 1)
+    assert.equal(stats.solveRatePct, 50)
+    assert.equal(stats.blocksCoordinated, 1)
+    assert.equal(stats.blocksProduced, 1)
+    assert.equal(stats.llmqSignatures, 1)
+    assert.deepEqual(stats.recentActivity[0]?.roles, ['coordinator', 'producer', 'committee_solved', 'llmq_signer'])
+    assert.deepEqual(stats.recentActivity[1]?.roles, ['committee_missed'])
+  })
+
+  it('enforces SSE topic filtering, per-IP caps, and global caps cleanly', () => {
+    resetSseHubForTests()
+    try {
+      assert.deepEqual(Array.from(parseTopicsParam('block,invalid,reorg')), ['block', 'reorg'])
+      assert.deepEqual(Array.from(parseTopicsParam(undefined)), ['block', 'mempool', 'reorg'])
+
+      const receivedA: string[] = []
+      const receivedB: string[] = []
+      const r1 = registerSseClient('10.0.0.1', new Set(['block']), (c) => receivedA.push(c), () => {}, { maxClients: 4, maxPerIp: 2 })
+      const r2 = registerSseClient('10.0.0.1', new Set(['mempool']), (c) => receivedB.push(c), () => {}, { maxClients: 4, maxPerIp: 2 })
+      const r3 = registerSseClient('10.0.0.1', new Set(['block']), () => {}, () => {}, { maxClients: 4, maxPerIp: 2 })
+
+      assert.equal(r1.ok, true)
+      assert.equal(r2.ok, true)
+      assert.equal(r3.ok, false)
+      if (!r3.ok) assert.equal(r3.status, 429)
+
+      const delivered = publishExplorerEvent('block', { height: 700 })
+      assert.equal(delivered, 1)
+      assert.equal(receivedA.length, 1)
+      assert.equal(receivedB.length, 0)
+      assert.match(receivedA[0]!, /event: block/)
+
+      if (r1.ok) r1.unregister()
+      if (r2.ok) r2.unregister()
+    } finally {
+      resetSseHubForTests()
+    }
+  })
+
+  it('builds valid OpenAPI 3.1.0 specification listing all v2.1 API paths', () => {
+    const spec = buildOpenApiSpec('https://explorer.kristalteknoloji.com')
+    assert.equal(spec.openapi, '3.1.0')
+    const paths = Object.keys(spec.paths)
+    for (const requiredPath of [
+      '/api/health',
+      '/api/openapi.json',
+      '/api/status',
+      '/api/supply',
+      '/api/fees',
+      '/api/contracts',
+      '/api/events',
+      '/api/tx/{id}',
+      '/api/tx/decode',
+      '/api/tx/broadcast',
+      '/api/address/{id}',
+      '/api/address/{id}/balance',
+      '/api/address/{id}/utxos',
+      '/api/address/{id}/txs',
+      '/api/validator/{address}'
+    ]) {
+      assert.ok(paths.includes(requiredPath), `OpenAPI spec missing ${requiredPath}`)
+    }
   })
 })

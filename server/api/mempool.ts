@@ -1,9 +1,12 @@
 import { callRpc, callRpcBatch } from '../utils/rpc'
-import { isBurnAddress } from '../utils/db'
+import { isBurnAddress, normalizeTaprootAddress } from '../utils/db'
+import { setCacheControl } from '../utils/api'
 
 const MEMPOOL_CACHE_TTL_MS = 3000
 let cachedMempool: any = null
 let cachedMempoolTime = 0
+let cachedMempoolRawTxs: Map<string, any> = new Map()
+let inflightMempoolPromise: Promise<{ payload: any; rawTxMap: Map<string, any> }> | null = null
 
 const ZERO_COIN_SENTINEL_TXID = '0000000000000000000000000000000000000000000000000000000000000001'
 
@@ -39,7 +42,7 @@ function classifyRawMempoolTx(rawTx: any): { txType: string; totalOut: number } 
       if (st === 'adam_coinlock') hasCoinLock = true
       else if (st === 'adam_powlock') hasPowLock = true
       else if (st === 'mescalcontract' || st === 'witness_v1_taproot') hasContract = true
-      if (isBurnAddress(addr) && sats > 0) hasBurn = true
+      if (isBurnAddress(normalizeTaprootAddress(addr)) && sats > 0) hasBurn = true
     }
   }
 
@@ -56,13 +59,17 @@ function classifyRawMempoolTx(rawTx: any): { txType: string; totalOut: number } 
   }
 }
 
-export default defineEventHandler(async () => {
+async function loadMempoolSnapshot(): Promise<{ payload: any; rawTxMap: Map<string, any> }> {
   const now = Date.now()
   if (cachedMempool && now - cachedMempoolTime < MEMPOOL_CACHE_TTL_MS) {
-    return cachedMempool
+    return { payload: cachedMempool, rawTxMap: cachedMempoolRawTxs }
   }
 
-  try {
+  if (inflightMempoolPromise) {
+    return inflightMempoolPromise
+  }
+
+  inflightMempoolPromise = (async () => {
     const info = await callRpc('getmempoolinfo').catch(() => ({ size: 0, bytes: 0, usage: 0 }))
     const rawPool = await callRpc('getrawmempool', [true]).catch(() => ({}))
 
@@ -127,12 +134,31 @@ export default defineEventHandler(async () => {
     }
 
     cachedMempool = payload
-    cachedMempoolTime = now
+    cachedMempoolRawTxs = rawTxMap
+    cachedMempoolTime = Date.now()
+    return { payload, rawTxMap }
+  })().finally(() => {
+    inflightMempoolPromise = null
+  })
+
+  return inflightMempoolPromise
+}
+
+export async function getCachedMempoolSummary() {
+  return loadMempoolSnapshot()
+}
+
+export default defineEventHandler(async (event) => {
+  try {
+    setCacheControl(event, 3, 5)
+    const { payload } = await loadMempoolSnapshot()
     return payload
   } catch (err: any) {
     console.error('[API /mempool] Error:', err?.message || err)
+    setResponseStatus(event, 500)
     return {
       success: false,
+      code: 'MEMPOOL_INSPECT_FAILED',
       error: 'Failed to inspect mempool'
     }
   }

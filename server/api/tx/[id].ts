@@ -1,5 +1,6 @@
 import { callRpc } from '../../utils/rpc'
 import { dbGet, dbQuery, isBurnAddress } from '../../utils/db'
+import { setCacheControl } from '../../utils/api'
 import { decodeOpReturnAsm } from '../../../app/utils/formatters'
 
 const ZERO_COIN_SENTINEL_TXID = '0000000000000000000000000000000000000000000000000000000000000001'
@@ -152,6 +153,8 @@ export default defineEventHandler(async (event) => {
     const txSize = tx.size || 0
     const feeRateSatByte = txSize > 0 && feeSats > 0 ? Math.round((feeSats / txSize) * 100) / 100 : 0
     const rawHex = typeof tx.hex === 'string' && tx.hex.length <= 131072 ? tx.hex : null
+
+    setCacheControl(event, (tx.confirmations || 0) >= 6 ? 60 : 5, 10)
 
     return {
       success: true,

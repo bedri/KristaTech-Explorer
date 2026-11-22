@@ -254,6 +254,8 @@ export function ensureDb(): Promise<sqlite3.Database> {
     await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vout_address ON vout(address);')
     await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vout_spent ON vout(spent_txid);')
     await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vout_unspent_addr ON vout(spent_txid, address);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vout_script_type ON vout(script_type);')
+    await runRaw(db, 'CREATE INDEX IF NOT EXISTS idx_vout_addr_spent_amount ON vout(address, spent_txid, amount DESC);')
 
     // SEC-11 Migration: upgrade any legacy 0x3fffffff Bech32m Taproot addresses to BIP-350 (0x2bc830a3)
     try {

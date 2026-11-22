@@ -8,6 +8,8 @@ import {
   normalizeTaprootAddress,
   TREASURY_ADDRESS
 } from '../utils/db'
+import { publishExplorerEvent, setMempoolFetcher } from '../utils/events'
+import { incrementReorgCount, updateIndexerState } from '../utils/indexerState'
 
 let isSyncing = false
 let hasBackfilledLegacy = false
@@ -486,6 +488,23 @@ async function syncBatch(startHeight: number, endHeight: number): Promise<boolea
       await insertBlockAndTxs(block, txMap)
     }
     await dbRun('COMMIT')
+
+    const tipBlock = blocks[blocks.length - 1]
+    if (tipBlock) {
+      updateIndexerState({
+        lastIndexedHeight: tipBlock.height
+      })
+      publishExplorerEvent('block', {
+        height: tipBlock.height,
+        hash: tipBlock.hash,
+        time: tipBlock.time,
+        txCount: Array.isArray(tipBlock.tx) ? tipBlock.tx.length : 0,
+        isPos: Boolean(tipBlock.isProofOfStake),
+        solvedSeats: countSolvedSeats(tipBlock.vAdamSolutions),
+        producerAddress: tipBlock.adamCoordinator || null,
+        batchSize: blocks.length
+      })
+    }
     return true
   } catch (err) {
     console.error(`[Indexer] Error syncing batch ${startHeight}-${endHeight}:`, err)
@@ -544,6 +563,13 @@ async function checkAndHandleReorg(targetMaxHeight: number): Promise<void> {
       await rollbackBlock(forkHeight)
       forkHeight--
     }
+    incrementReorgCount()
+    updateIndexerState({ lastIndexedHeight: forkHeight })
+    publishExplorerEvent('reorg', {
+      previousHeight: row.height,
+      rolledBackToHeight: forkHeight,
+      timestamp: Math.floor(Date.now() / 1000)
+    })
     console.warn(`[Indexer] Reorg handled, rolled back to height ${forkHeight}`)
   }
 }
@@ -551,6 +577,10 @@ async function checkAndHandleReorg(targetMaxHeight: number): Promise<void> {
 async function syncLoop() {
   if (isSyncing) return
   isSyncing = true
+  updateIndexerState({
+    isSyncing: true,
+    lastSyncAttemptAt: Date.now()
+  })
 
   try {
     await ensureDb()
@@ -558,6 +588,7 @@ async function syncLoop() {
 
     const nodeInfo = await callRpc('getblockchaininfo')
     const targetMaxHeight = nodeInfo.blocks
+    updateIndexerState({ nodeTipHeight: targetMaxHeight })
 
     await checkAndHandleReorg(targetMaxHeight)
 
@@ -585,15 +616,29 @@ async function syncLoop() {
       }
       console.log(`[Indexer] Synced up to block ${nextHeightToSync - 1}`)
     }
-  } catch (err) {
+
+    const latestRow = await dbGet('SELECT MAX(height) as height FROM blocks')
+    updateIndexerState({
+      lastSyncSuccessAt: Date.now(),
+      lastSyncError: null,
+      lastSyncErrorAt: null,
+      lastIndexedHeight: latestRow?.height ?? null
+    })
+  } catch (err: any) {
     console.error('[Indexer] Sync loop error:', err)
+    updateIndexerState({
+      lastSyncError: String(err?.message || err || 'Sync loop failed'),
+      lastSyncErrorAt: Date.now()
+    })
   } finally {
     isSyncing = false
+    updateIndexerState({ isSyncing: false })
     setTimeout(syncLoop, 4000)
   }
 }
 
 export default defineNitroPlugin(() => {
   console.log('[Indexer] Initializing background syncing plugin...')
+  setMempoolFetcher(() => callRpc('getrawmempool', [false]))
   setTimeout(syncLoop, 1000)
 })

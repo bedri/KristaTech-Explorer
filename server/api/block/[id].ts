@@ -1,5 +1,6 @@
 import { callRpc } from '../../utils/rpc'
 import { dbGet, dbQuery, isBurnAddress, TREASURY_ADDRESS } from '../../utils/db'
+import { setCacheControl } from '../../utils/api'
 import { getValidatorPoolData } from '../validators'
 import {
   calculateBlockSubsidy,
@@ -167,6 +168,8 @@ export default defineEventHandler(async (event) => {
     const totalFees = Math.round(totalFeesSats) / 1e8
     const subsidy = calculateBlockSubsidy(block.height)
     const blockReward = normalizeAmount(dbMeta?.reward || subsidy)
+
+    setCacheControl(event, (block.confirmations || 0) >= 6 ? 60 : 5, 10)
 
     return {
       success: true,

@@ -33,6 +33,8 @@ export default defineNuxtConfig({
     rpcPort: process.env.NUXT_RPC_PORT || '27998',
     rpcCookiePath: process.env.NUXT_RPC_COOKIE_PATH || '',
     rpcUser: process.env.NUXT_RPC_USER || '',
-    rpcPassword: process.env.NUXT_RPC_PASSWORD || ''
+    rpcPassword: process.env.NUXT_RPC_PASSWORD || '',
+    enableTxBroadcast: process.env.NUXT_ENABLE_TX_BROADCAST || 'false',
+    apiCorsOrigin: process.env.NUXT_API_CORS_ORIGIN || '*'
   }
 })

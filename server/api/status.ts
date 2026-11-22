@@ -1,5 +1,6 @@
 import { callRpc } from '../utils/rpc'
 import { BURN_ADDRESSES, dbGet, dbQuery } from '../utils/db'
+import { setCacheControl } from '../utils/api'
 import { getValidatorPoolData } from './validators'
 import {
   buildConsensusInfo,
@@ -277,13 +278,16 @@ async function fetchStatusData(): Promise<any> {
   }
 }
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   try {
+    setCacheControl(event, 3, 5)
     return await getCachedStatusData()
   } catch (err) {
     console.error('[API /status] Error:', err)
+    setResponseStatus(event, 500)
     return {
       success: false,
+      code: 'STATUS_FETCH_FAILED',
       error: 'Failed to fetch network status'
     }
   }

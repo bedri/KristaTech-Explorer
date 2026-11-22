@@ -1,5 +1,6 @@
 import { callRpc } from '../utils/rpc'
 import { dbQuery } from '../utils/db'
+import { setCacheControl } from '../utils/api'
 import { getCachedStatusData } from './status'
 import {
   calculateBlockSubsidy,
@@ -14,7 +15,8 @@ let cachedNetworkTime = 0
 
 const SPORK_DEFAULT_OFF = 4070908800
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+  setCacheControl(event, 5, 10)
   const now = Date.now()
   if (cachedNetwork && now - cachedNetworkTime < NETWORK_CACHE_TTL_MS) {
     return cachedNetwork
@@ -188,8 +190,10 @@ export default defineEventHandler(async () => {
     return payload
   } catch (err: any) {
     console.error('[API /network] Error:', err?.message || err)
+    setResponseStatus(event, 500)
     return {
       success: false,
+      code: 'NETWORK_ANALYTICS_FAILED',
       error: 'Failed to load network analytics'
     }
   }

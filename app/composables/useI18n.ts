@@ -229,7 +229,18 @@ const translations: Record<string, Record<string, string>> = {
     searchTypePubkey: 'Validator PubKey',
     noUtxos: 'No unspent outputs (UTXOs) currently held by this address.',
     noCoordinatedBlocks: 'No blocks coordinated or produced by this address yet.',
-    sortStatusTemplate: 'Sorted by'
+    sortStatusTemplate: 'Sorted by',
+    apiOpenApiBtn: 'OpenAPI 3.1 JSON',
+    apiCorsRateInfo: 'CORS enabled • 120 req/min general limit (10 req/min on broadcast) • X-API-Version: 2.1',
+    apiCategoryAll: 'All Endpoints',
+    apiOptInBadge: 'Opt-In',
+    apiSseTitle: 'Live Real-Time Stream (SSE)',
+    apiSseDesc: 'Subscribe to instant block, mempool, and reorg notifications over Server-Sent Events (/api/events).',
+    apiSseConnect: 'Connect Stream',
+    apiSseDisconnect: 'Disconnect',
+    apiSseConnected: 'Connected',
+    apiSseDisconnected: 'Disconnected',
+    apiSseEmptyLog: 'Connect to /api/events to inspect live incoming SSE frames.'
   },
   tr: {
     explorer: 'EXPLORER',
@@ -459,7 +470,18 @@ const translations: Record<string, Record<string, string>> = {
     searchTypePubkey: 'Doğrulayıcı PubKey',
     noUtxos: 'Bu adreste şu anda harcanmamış çıktı (UTXO) bulunmuyor.',
     noCoordinatedBlocks: 'Bu adres tarafından koordine edilen veya üretilen blok bulunmuyor.',
-    sortStatusTemplate: 'Sıralama ölçütü:'
+    sortStatusTemplate: 'Sıralama ölçütü:',
+    apiOpenApiBtn: 'OpenAPI 3.1 JSON',
+    apiCorsRateInfo: 'CORS aktif • Genel limit 120 istek/dk (yayın 10 istek/dk) • X-API-Version: 2.1',
+    apiCategoryAll: 'Tüm Uç Noktalar',
+    apiOptInBadge: 'İsteğe Bağlı',
+    apiSseTitle: 'Canlı Gerçek Zamanlı Akış (SSE)',
+    apiSseDesc: 'Server-Sent Events (/api/events) üzerinden anlık blok, mempool ve reorg bildirimlerine abone olun.',
+    apiSseConnect: 'Akışa Bağlan',
+    apiSseDisconnect: 'Bağlantıyı Kes',
+    apiSseConnected: 'Bağlı',
+    apiSseDisconnected: 'Bağlı Değil',
+    apiSseEmptyLog: 'Gelen canlı SSE olaylarını görmek için /api/events akışına bağlanın.'
   },
   es: {
     explorer: 'EXPLORADOR',

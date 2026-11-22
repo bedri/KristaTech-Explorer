@@ -1,4 +1,5 @@
 import { getCachedStatusData } from './status'
+import { setCacheControl } from '../utils/api'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
@@ -6,6 +7,7 @@ export default defineEventHandler(async (event) => {
   const format = ((query.format as string) || '').toLowerCase().trim()
 
   try {
+    setCacheControl(event, 5, 10)
     const status = await getCachedStatusData()
 
     if (q === 'circulating' || q === 'circulatingsupply') {

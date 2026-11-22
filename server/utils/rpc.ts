@@ -25,8 +25,99 @@ export const ALLOWED_RPC_METHODS = new Set([
   'getblockhash',
   'getblock',
   'getrawtransaction',
-  'decompilemescal'
+  'decompilemescal',
+  'estimatesmartfee',
+  'estimatefee',
+  'getfeeinfo',
+  'gettxout',
+  'decoderawtransaction',
+  'validateaddress'
 ])
+
+export const BROADCAST_RPC_METHOD = 'sendrawtransaction'
+export const MAX_RAW_TX_HEX_LENGTH = 200_000 // 100 KB hex cap
+
+export function validateRawTxHex(raw: unknown): {
+  valid: boolean
+  normalized?: string
+  byteLength?: number
+  error?: string
+} {
+  if (typeof raw !== 'string') {
+    return { valid: false, error: 'Transaction hex must be a string' }
+  }
+  const normalized = raw.trim().toLowerCase()
+  if (normalized.length === 0) {
+    return { valid: false, error: 'Transaction hex is required' }
+  }
+  if (normalized.length > MAX_RAW_TX_HEX_LENGTH) {
+    return {
+      valid: false,
+      error: `Transaction hex exceeds maximum allowed size (${MAX_RAW_TX_HEX_LENGTH / 2} bytes)`
+    }
+  }
+  if (normalized.length < 20) {
+    return { valid: false, error: 'Transaction hex is too short' }
+  }
+  if (normalized.length % 2 !== 0) {
+    return { valid: false, error: 'Transaction hex must have an even number of characters' }
+  }
+  if (!/^[0-9a-f]+$/.test(normalized)) {
+    return { valid: false, error: 'Transaction hex contains non-hexadecimal characters' }
+  }
+  return {
+    valid: true,
+    normalized,
+    byteLength: normalized.length / 2
+  }
+}
+
+export function isTxBroadcastEnabled(config?: any): boolean {
+  const flag = config?.enableTxBroadcast ?? process.env.NUXT_ENABLE_TX_BROADCAST
+  if (flag === true) return true
+  return String(flag || '').toLowerCase() === 'true'
+}
+
+export async function broadcastRawTransaction(rawHex: string): Promise<string> {
+  const config = useRuntimeConfig()
+  if (!isTxBroadcastEnabled(config)) {
+    throw new Error('TX_BROADCAST_DISABLED')
+  }
+
+  const check = validateRawTxHex(rawHex)
+  if (!check.valid || !check.normalized) {
+    throw new Error(check.error || 'Invalid raw transaction hex')
+  }
+
+  const { url, auth } = getRpcConnectionInfo(config)
+  const rpcMethod = BROADCAST_RPC_METHOD
+  const payload = {
+    jsonrpc: '1.0',
+    id: 'krista-explorer-broadcast',
+    method: rpcMethod,
+    params: [check.normalized, false]
+  }
+
+  const response = (await $fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/plain;',
+      Authorization: `Basic ${auth}`
+    },
+    body: JSON.stringify(payload)
+  })) as any
+
+  if (response?.error) {
+    const msg = response.error?.message || JSON.stringify(response.error)
+    throw new Error(`RPC Error: ${msg}`)
+  }
+
+  if (typeof response?.result !== 'string' || !/^[0-9a-fA-F]{64}$/.test(response.result)) {
+    throw new Error('Unexpected RPC broadcast response')
+  }
+
+  return response.result.toLowerCase()
+}
 
 export function assertAllowedRpcMethod(method: string, params: any[] = []): void {
   if (!ALLOWED_RPC_METHODS.has(method)) {

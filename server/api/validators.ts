@@ -1,5 +1,6 @@
 import { callRpc } from '../utils/rpc'
 import { dbGet } from '../utils/db'
+import { setCacheControl } from '../utils/api'
 import {
   ADAM_COIN_LOCK_TRACK_QUOTA,
   ADAM_COORD_WEIGHT_COIN_LOCK,
@@ -202,13 +203,16 @@ export async function getValidatorPoolData() {
   return payload
 }
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   try {
+    setCacheControl(event, 8, 10)
     return await getValidatorPoolData()
   } catch (err: any) {
     console.error('[API /validators] Error:', err?.message || err)
+    setResponseStatus(event, 500)
     return {
       success: false,
+      code: 'VALIDATORS_FETCH_FAILED',
       error: 'Failed to fetch validator pool'
     }
   }

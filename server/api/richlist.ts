@@ -1,4 +1,5 @@
 import { BURN_ADDRESSES, dbGet, dbQuery, TREASURY_ADDRESS } from '../utils/db'
+import { setCacheControl } from '../utils/api'
 import { getCachedStatusData } from './status'
 import { getValidatorPoolData } from './validators'
 
@@ -22,6 +23,7 @@ function normalizeAmount(val: number | null | undefined): number {
 }
 
 export default defineEventHandler(async (event) => {
+  setCacheControl(event, 10, 15)
   const query = getQuery(event)
   const limit = Math.min(100, Math.max(10, parseInt((query.limit as string) || '100', 10) || 100))
   const now = Date.now()

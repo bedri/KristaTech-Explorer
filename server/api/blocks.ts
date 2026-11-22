@@ -1,4 +1,5 @@
 import { dbGet, dbQuery } from '../utils/db'
+import { setCacheControl } from '../utils/api'
 import { calculateBlockSubsidy } from '../../app/utils/protocol'
 
 function normalizeAmount(val: number | null | undefined): number {
@@ -6,6 +7,7 @@ function normalizeAmount(val: number | null | undefined): number {
 }
 
 export default defineEventHandler(async (event) => {
+  setCacheControl(event, 5, 5)
   const query = getQuery(event)
   const page = Math.max(1, parseInt((query.page as string) || '1', 10) || 1)
   const limit = Math.min(100, Math.max(10, parseInt((query.limit as string) || '25', 10) || 25))
