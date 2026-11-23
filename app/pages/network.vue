@@ -1,14 +1,30 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from '~/composables/useI18n'
-import { calculateModelDSplits } from '~/utils/protocol'
+import { calculateModelDSplits, getDynamicLlmqSpec } from '~/utils/protocol'
 import { formatBytes, formatCoins, formatHashrate, formatNumber } from '~/utils/formatters'
 
 const { locale, t } = useI18n()
 const { data: net, refresh } = await useFetch('/api/network')
 
 const simHeight = ref(5000)
-const simSplits = computed(() => calculateModelDSplits(Math.max(0, Number(simHeight.value) || 0)))
+const simActiveMns = ref(net.value?.activeMnCount || 5)
+watch(
+  () => net.value?.activeMnCount,
+  (val) => {
+    if (typeof val === 'number' && val > 0) {
+      simActiveMns.value = val
+    }
+  }
+)
+const simLlmqSpec = computed(() => getDynamicLlmqSpec(Math.max(0, Number(simActiveMns.value) || 0)))
+const simSplits = computed(() =>
+  calculateModelDSplits(
+    Math.max(0, Number(simHeight.value) || 0),
+    undefined,
+    Math.max(0, Number(simActiveMns.value) || 0)
+  )
+)
 
 // Pure-SVG chart geometry for Block Intervals (Δt)
 const intervalBars = computed(() => {
@@ -103,6 +119,9 @@ const volumeBars = computed(() => {
       <div class="glass-card rounded-xl p-5">
         <p class="text-xs text-slate-500">{{ t('connectedPeers') }}</p>
         <p class="text-2xl font-extrabold text-brand-blue mt-1">{{ net.peers?.length || 0 }} {{ t('peers') }}</p>
+        <p class="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+          {{ net.bip324PeersCount || 0 }} {{ t('bip324Transport') }}
+        </p>
       </div>
     </div>
 
@@ -211,7 +230,7 @@ const volumeBars = computed(() => {
             Inspect exact consensus block subsidy & Model D payouts at any Mainnet height.
           </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <label for="sim-height-input" class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ t('height') }}:</label>
           <input
             id="sim-height-input"
@@ -220,7 +239,7 @@ const volumeBars = computed(() => {
             min="2"
             max="10000000"
             step="100"
-            class="w-32 h-9 px-3 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 font-mono text-xs font-bold"
+            class="w-28 h-9 px-3 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 font-mono text-xs font-bold"
           />
           <button
             v-for="preset in [100, 500, 2500, 4800, 5000, 259202]"
@@ -230,6 +249,26 @@ const volumeBars = computed(() => {
             class="hidden md:inline-flex px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-white/5 text-[11px] font-mono cursor-pointer"
           >
             #{{ preset }}
+          </button>
+
+          <label for="sim-mns-input" class="text-xs font-semibold text-slate-600 dark:text-slate-300 ml-1">{{ t('activeMnsSimLabel') }}:</label>
+          <input
+            id="sim-mns-input"
+            v-model.number="simActiveMns"
+            type="number"
+            min="0"
+            max="1000"
+            step="1"
+            class="w-20 h-9 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 font-mono text-xs font-bold"
+          />
+          <button
+            v-for="mnPreset in [5, 25, 50, 100]"
+            :key="`mn-${mnPreset}`"
+            type="button"
+            @click="simActiveMns = mnPreset"
+            class="hidden lg:inline-flex px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[11px] font-mono cursor-pointer"
+          >
+            {{ mnPreset }} MN
           </button>
         </div>
       </div>
@@ -262,7 +301,7 @@ const volumeBars = computed(() => {
           </div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.llmqTotal, 4) }}</div>
           <div v-if="simHeight >= 5000" class="text-[10px] text-slate-500 mt-0.5">
-            1-Blk Lag • {{ simSplits.llmqPerSigner }}/signer
+            LLMQ {{ simLlmqSpec.threshold }}/{{ simLlmqSpec.size }} • {{ simSplits.llmqPerSigner }}/signer
           </div>
         </div>
         <div class="p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
@@ -296,7 +335,15 @@ const volumeBars = computed(() => {
             <tbody class="divide-y divide-slate-200/60 dark:divide-white/5">
               <tr v-for="p in net?.peers || []" :key="p.id">
                 <td class="p-3 font-mono text-xs text-brand-blue">{{ p.addrMasked }}</td>
-                <td class="p-3 font-mono text-xs">{{ p.subver }}</td>
+                <td class="p-3 font-mono text-xs">
+                  <span>{{ p.subver }}</span>
+                  <span
+                    v-if="p.bip324"
+                    class="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold"
+                  >
+                    BIP324 v2
+                  </span>
+                </td>
                 <td class="p-3 font-mono text-xs font-semibold">{{ p.version }}</td>
                 <td class="p-3 text-right font-mono text-xs">{{ p.pingMs !== null ? `${p.pingMs} ms` : '—' }}</td>
               </tr>

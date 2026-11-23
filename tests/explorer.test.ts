@@ -13,6 +13,7 @@ import {
   getDynamicLlmqSpec,
   classifyBlockRewardOutputs,
   detectSearchQueryType,
+  hasBip324ServiceFlag,
   maskPeerAddr
 } from '../app/utils/protocol.ts'
 import {
@@ -24,6 +25,7 @@ import {
   shortenHash,
   formatBytes,
   formatHashrate,
+  decodeKtdip3ProTxAsm,
   decodeOpReturnAsm
 } from '../app/utils/formatters.ts'
 import { generateQrMatrix } from '../app/utils/qr.ts'
@@ -43,6 +45,7 @@ import {
 import {
   BoundedTtlCache,
   isValidAddressParam,
+  isValidBlsPubkey,
   isValidCompressedPubkey,
   isValidTxid,
   parsePagination
@@ -604,5 +607,44 @@ describe('API v2.1 Utilities, Validation, Caching, Fees, Validator Stats, SSE & 
     ]) {
       assert.ok(paths.includes(requiredPath), `OpenAPI spec missing ${requiredPath}`)
     }
+    const txTypeParam = spec.paths['/api/transactions'].get.parameters.find((p: any) => p.name === 'type')
+    assert.ok(txTypeParam?.schema?.enum?.includes('protx'), 'OpenAPI /api/transactions missing protx enum')
+  })
+
+  it('supports KTDIP3 ProTx decoding, read-only protx RPC guard, BLS12-381 search, and BIP324 service flag', () => {
+    // 1. Read-only protx RPC guard allows only list & info
+    assert.doesNotThrow(() => assertAllowedRpcMethod('protx', ['list', 'detailed']))
+    assert.doesNotThrow(() => assertAllowedRpcMethod('protx', ['info', 'a'.repeat(64)]))
+    for (const mutating of ['register', 'update_service', 'update_registrar', 'revoke', 'wallet_list', 'set_alias', 'remove_meta', 'bls_generate']) {
+      assert.throws(() => assertAllowedRpcMethod('protx', [mutating]))
+    }
+
+    // 2. Real mainnet KTDIP3 ProRegTx OP_RETURN prefix + other types
+    const reg = decodeKtdip3ProTxAsm('OP_RETURN 4b544449503301010063ce833e')
+    assert.ok(reg)
+    assert.equal(reg.magic, 'KTDIP3')
+    assert.equal(reg.code, 1)
+    assert.equal(reg.type, 'protx_reg')
+    assert.equal(reg.version, 1)
+
+    assert.equal(decodeKtdip3ProTxAsm('OP_RETURN 4b5444495033020100')?.type, 'protx_upserv')
+    assert.equal(decodeKtdip3ProTxAsm('OP_RETURN 4b5444495033030100')?.type, 'protx_upreg')
+    assert.equal(decodeKtdip3ProTxAsm('OP_RETURN 4b5444495033040100')?.type, 'protx_uprev')
+    assert.equal(decodeKtdip3ProTxAsm('OP_RETURN 4b5444495033000100'), null)
+    assert.equal(decodeKtdip3ProTxAsm('OP_RETURN 4b5444495033050100'), null)
+    assert.equal(decodeKtdip3ProTxAsm('OP_RETURN deadbeef'), null)
+
+    // 3. BIP324 NODE_P2P_V2 (1 << 11 = 0x800) flag parsing
+    assert.equal(hasBip324ServiceFlag('0000000000000805'), true)
+    assert.equal(hasBip324ServiceFlag(0x805), true)
+    assert.equal(hasBip324ServiceFlag('0000000000000005'), false)
+    assert.equal(hasBip324ServiceFlag(null), false)
+    assert.equal(hasBip324ServiceFlag('invalid-hex'), false)
+
+    // 4. 96-hex BLS12-381 operator pubkey detection & validation
+    const blsHex = 'b70a455de3ce61b9df7854b928fd4d4a75adb0adf61852996e42b8b8f26a909dd54ddaa0ad88e50d6533882c2713ce80'
+    assert.equal(detectSearchQueryType(blsHex), 'bls_pubkey')
+    assert.equal(isValidBlsPubkey(blsHex), true)
+    assert.equal(isValidBlsPubkey('b70a'), false)
   })
 })

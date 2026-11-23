@@ -125,3 +125,78 @@ export function decodeOpReturnAsm(asm: string | undefined | null): {
     }
   }
 }
+
+export interface Ktdip3ProTxDecoded {
+  magic: 'KTDIP3'
+  code: number
+  type: 'protx_reg' | 'protx_upserv' | 'protx_upreg' | 'protx_uprev'
+  version: number | null
+  label: string
+  labelTr: string
+  payloadBytes: number
+}
+
+const KTDIP3_MAGIC_HEX = '4b5444495033' // "KTDIP3"
+const KTDIP3_TYPES: Record<
+  number,
+  { type: Ktdip3ProTxDecoded['type']; label: string; labelTr: string }
+> = {
+  1: {
+    type: 'protx_reg',
+    label: 'KTDIP3 ProRegTx (Masternode Registration)',
+    labelTr: 'KTDIP3 ProRegTx (Masternode Kaydı)'
+  },
+  2: {
+    type: 'protx_upserv',
+    label: 'KTDIP3 ProUpServTx (Update Service / PoSe Revive)',
+    labelTr: 'KTDIP3 ProUpServTx (Servis Güncelle / PoSe Canlandır)'
+  },
+  3: {
+    type: 'protx_upreg',
+    label: 'KTDIP3 ProUpRegTx (Update Registrar / Payout)',
+    labelTr: 'KTDIP3 ProUpRegTx (Operatör / Ödeme Güncelle)'
+  },
+  4: {
+    type: 'protx_uprev',
+    label: 'KTDIP3 ProUpRevTx (Revoke Operator)',
+    labelTr: 'KTDIP3 ProUpRevTx (Operatör İptali)'
+  }
+}
+
+export function decodeKtdip3ProTxAsm(asm: string | undefined | null): Ktdip3ProTxDecoded | null {
+  if (!asm || !asm.includes('OP_RETURN')) return null
+  const parts = asm.trim().split(/\s+/)
+  const idx = parts.indexOf('OP_RETURN')
+  if (idx === -1 || idx + 1 >= parts.length) return null
+
+  const payloadHex = parts.slice(idx + 1).join('').toLowerCase()
+  if (
+    payloadHex.length < 14 ||
+    payloadHex.length % 2 !== 0 ||
+    !/^[0-9a-f]+$/.test(payloadHex) ||
+    !payloadHex.startsWith(KTDIP3_MAGIC_HEX)
+  ) {
+    return null
+  }
+
+  const code = parseInt(payloadHex.slice(12, 14), 16)
+  const meta = KTDIP3_TYPES[code]
+  if (!meta) return null
+
+  let version: number | null = null
+  if (payloadHex.length >= 18) {
+    const lo = parseInt(payloadHex.slice(14, 16), 16)
+    const hi = parseInt(payloadHex.slice(16, 18), 16)
+    version = lo | (hi << 8)
+  }
+
+  return {
+    magic: 'KTDIP3',
+    code,
+    type: meta.type,
+    version,
+    label: meta.label,
+    labelTr: meta.labelTr,
+    payloadBytes: payloadHex.length / 2
+  }
+}

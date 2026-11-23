@@ -31,7 +31,8 @@ export const ALLOWED_RPC_METHODS = new Set([
   'getfeeinfo',
   'gettxout',
   'decoderawtransaction',
-  'validateaddress'
+  'validateaddress',
+  'protx'
 ])
 
 export const BROADCAST_RPC_METHOD = 'sendrawtransaction'
@@ -127,6 +128,12 @@ export function assertAllowedRpcMethod(method: string, params: any[] = []): void
     const subcmd = String(params[0] ?? '')
     if (subcmd !== 'show' && subcmd !== 'active') {
       throw new Error(`Disallowed spork subcommand: ${subcmd}`)
+    }
+  }
+  if (method === 'protx') {
+    const subcmd = String(params[0] ?? '')
+    if (subcmd !== 'list' && subcmd !== 'info') {
+      throw new Error(`Disallowed protx subcommand: ${subcmd}`)
     }
   }
 }

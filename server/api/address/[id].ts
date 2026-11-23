@@ -172,13 +172,36 @@ export default defineEventHandler(async (event) => {
         typeof u.block_height === 'number' ? Math.max(1, currentHeight - u.block_height + 1) : 0
     }))
 
-    // 5. Validator & Quorum membership + produced/coordinated blocks
+    // 5. Validator, KTDIP3 Masternode roles & Quorum membership + produced/coordinated blocks
     let validatorEntries: any[] = []
     let quorumMember: any = null
+    let masternodeRoles: any[] = []
     try {
       const pool = await getValidatorPoolData()
       validatorEntries = (pool.validators || []).filter((v: any) => v.address === address)
       quorumMember = (pool.quorum?.members || []).find((m: any) => m.addr === address) || null
+
+      for (const mn of pool.masternodes || []) {
+        const roles: ('owner' | 'payout' | 'voting')[] = []
+        if (mn.ownerAddress === address || mn.addr === address) roles.push('owner')
+        if (mn.payoutAddress === address) roles.push('payout')
+        if (mn.votingAddress === address) roles.push('voting')
+        if (roles.length > 0) {
+          masternodeRoles.push({
+            roles,
+            proTxHash: mn.proTxHash || '',
+            status: mn.status || 'ENABLED',
+            dip3: Boolean(mn.dip3),
+            posePenalty: mn.posePenalty ?? 0,
+            registeredHeight: mn.registeredHeight ?? 0,
+            ownerAddress: mn.ownerAddress || mn.addr || '',
+            payoutAddress: mn.payoutAddress || mn.addr || '',
+            votingAddress: mn.votingAddress || mn.addr || '',
+            operatorPubKey: mn.operatorPubKey || mn.pubkey || '',
+            serviceMasked: mn.serviceMasked || null
+          })
+        }
+      }
     } catch (_) {}
 
     const producedRows = await dbQuery(
@@ -222,6 +245,7 @@ export default defineEventHandler(async (event) => {
       transactions,
       utxos,
       validatorEntries,
+      masternodeRoles,
       quorumMember,
       producedBlocks
     }

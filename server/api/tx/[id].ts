@@ -1,7 +1,8 @@
 import { callRpc } from '../../utils/rpc'
 import { dbGet, dbQuery, isBurnAddress } from '../../utils/db'
 import { setCacheControl } from '../../utils/api'
-import { decodeOpReturnAsm } from '../../../app/utils/formatters'
+import { decodeKtdip3ProTxAsm, decodeOpReturnAsm } from '../../../app/utils/formatters'
+import { maskPeerAddr } from '../../../app/utils/protocol'
 
 const ZERO_COIN_SENTINEL_TXID = '0000000000000000000000000000000000000000000000000000000000000001'
 
@@ -102,6 +103,10 @@ export default defineEventHandler(async (event) => {
         o.script_type === 'nulldata' || o.address === 'OP_RETURN'
           ? decodeOpReturnAsm(scriptAsm)
           : null
+      const proTxDecoded =
+        o.script_type === 'nulldata' || o.address === 'OP_RETURN'
+          ? decodeKtdip3ProTxAsm(scriptAsm)
+          : null
 
       let mescalDecompiled: any = null
       if (o.script_type === 'mescalcontract' && scriptHex) {
@@ -118,6 +123,7 @@ export default defineEventHandler(async (event) => {
         script_hex: scriptHex,
         isBurn: isBurnAddress(o.address),
         opReturnDecoded,
+        proTxDecoded,
         mescalDecompiled
       })
     }
@@ -137,7 +143,42 @@ export default defineEventHandler(async (event) => {
     // 4. Calculate stats with satoshi precision
     const isCoinbase = Boolean(txRow?.is_coinbase) || (tx.vin.length > 0 && !!tx.vin[0].coinbase)
     const isCoinstake = Boolean(txRow?.is_coinstake)
-    const txType = txRow?.tx_type || (isCoinbase ? 'coinbase' : isCoinstake ? 'coinstake' : 'standard')
+    const txProTx = enrichedVout.find((o: any) => o.proTxDecoded)?.proTxDecoded || null
+    let txType = txRow?.tx_type || (isCoinbase ? 'coinbase' : isCoinstake ? 'coinstake' : 'standard')
+    if (txProTx && txType === 'standard') {
+      txType = 'protx'
+    }
+
+    let proTxInfo: any = null
+    if (txProTx) {
+      try {
+        const info = await callRpc('protx', ['info', txid])
+        if (info && typeof info === 'object') {
+          const opRewardBps = typeof info.operatorReward === 'number' ? info.operatorReward : 0
+          proTxInfo = {
+            proTxHash: info.proTxHash || txid,
+            collateralHash: info.collateralHash || '',
+            collateralIndex: info.collateralIndex ?? 0,
+            serviceMasked: info.service ? maskPeerAddr(info.service) : null,
+            ownerAddress: info.ownerAddress || '',
+            votingAddress: info.votingAddress || '',
+            payoutAddress: info.payoutAddress || info.ownerAddress || '',
+            operatorPubKey: info.operatorPubKey || '',
+            operatorRewardBps: opRewardBps,
+            operatorRewardPct: Math.round((opRewardBps / 100) * 100) / 100,
+            registeredHeight: info.registeredHeight ?? -1,
+            lastPaidHeight: info.lastPaidHeight ?? 0,
+            posePenalty: info.PoSePenalty ?? 0,
+            poseRevivedHeight: info.PoSeRevivedHeight ?? -1,
+            poseBanHeight: info.PoSeBanHeight ?? -1,
+            revocationReason: info.revocationReason ?? 0,
+            valid: Boolean(info.valid)
+          }
+        }
+      } catch (_) {
+        proTxInfo = null
+      }
+    }
 
     let feeSats = 0
     let totalInSats = 0
@@ -169,6 +210,8 @@ export default defineEventHandler(async (event) => {
       isCoinbase,
       isCoinstake,
       txType,
+      proTx: txProTx,
+      proTxInfo,
       fee: fromSatoshi(feeSats),
       feeRateSatByte,
       totalIn: fromSatoshi(totalInSats),

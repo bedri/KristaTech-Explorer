@@ -12,7 +12,7 @@ export default defineNuxtConfig({
         {
           name: 'description',
           content:
-            'Real-time KristaTech (KRISTA) blockchain explorer: ADAM 11+1 hybrid PoW/PoS blocks, 4,200:250:10 Fair Coordinator VRF (75% MN floor), KTDIP3 & dynamic LLMQ BLS quorums, MESCAL Taproot smart contracts, mempool, supply & rich list.'
+            'Real-time KristaTech (KRISTA) blockchain explorer: ADAM 11+1 hybrid PoW/PoS blocks, 4,200:250:10 Proportional VRF (75% MN floor), KTDIP3 (wallet.dat mnmeta) & dynamic LLMQ BLS quorums, BIP324 P2P v2, MESCAL v2 Taproot & BIP174 PSBT smart contracts, mempool, supply & rich list.'
         }
       ],
       link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico?v=2' }]

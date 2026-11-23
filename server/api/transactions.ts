@@ -15,6 +15,7 @@ const VALID_FILTERS = new Set([
   'coin_lock',
   'pow_lock',
   'zerocoin_pow',
+  'protx',
   'burn',
   'contract'
 ])
@@ -34,7 +35,7 @@ export default defineEventHandler(async (event) => {
   if (filter === 'rewards') {
     whereSql = "WHERE t.tx_type IN ('coinbase', 'coinstake')"
   } else if (filter === 'registrations') {
-    whereSql = "WHERE t.tx_type IN ('coin_lock', 'pow_lock', 'zerocoin_pow')"
+    whereSql = "WHERE t.tx_type IN ('coin_lock', 'pow_lock', 'zerocoin_pow', 'protx')"
   } else if (filter !== 'all') {
     whereSql = 'WHERE t.tx_type = ?'
     params.push(filter)
@@ -54,6 +55,7 @@ export default defineEventHandler(async (event) => {
       coin_lock: 0,
       pow_lock: 0,
       zerocoin_pow: 0,
+      protx: 0,
       burn: 0,
       contract: 0
     }
@@ -65,7 +67,10 @@ export default defineEventHandler(async (event) => {
     }
     countsByType.rewards = (countsByType.coinbase || 0) + (countsByType.coinstake || 0)
     countsByType.registrations =
-      (countsByType.coin_lock || 0) + (countsByType.pow_lock || 0) + (countsByType.zerocoin_pow || 0)
+      (countsByType.coin_lock || 0) +
+      (countsByType.pow_lock || 0) +
+      (countsByType.zerocoin_pow || 0) +
+      (countsByType.protx || 0)
 
     const countRow =
       filter === 'all'

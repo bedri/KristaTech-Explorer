@@ -372,7 +372,35 @@ export function calculateCoordinatorWeights(counts: {
   }
 }
 
-export type DetectedQueryType = 'empty' | 'height' | 'hash' | 'taproot' | 'address' | 'pubkey' | 'unknown'
+export type DetectedQueryType =
+  | 'empty'
+  | 'height'
+  | 'hash'
+  | 'taproot'
+  | 'address'
+  | 'pubkey'
+  | 'bls_pubkey'
+  | 'unknown'
+
+export const NODE_P2P_V2_SERVICE_BIT = 0x800n // 1 << 11 (BIP324 v2 encrypted transport)
+
+export function hasBip324ServiceFlag(services: string | number | null | undefined): boolean {
+  if (services === null || services === undefined) return false
+  try {
+    let bits = 0n
+    if (typeof services === 'number') {
+      if (!Number.isFinite(services) || services < 0) return false
+      bits = BigInt(Math.floor(services))
+    } else {
+      const cleaned = String(services).trim().replace(/^0x/i, '')
+      if (!/^[0-9a-fA-F]+$/.test(cleaned)) return false
+      bits = BigInt(`0x${cleaned}`)
+    }
+    return (bits & NODE_P2P_V2_SERVICE_BIT) !== 0n
+  } catch (_) {
+    return false
+  }
+}
 
 export function detectSearchQueryType(raw: string): DetectedQueryType {
   const q = (raw || '').trim()
@@ -380,6 +408,7 @@ export function detectSearchQueryType(raw: string): DetectedQueryType {
   if (/^\d{1,9}$/.test(q)) return 'height'
   if (/^[0-9a-fA-F]{64}$/.test(q)) return 'hash'
   if (/^(02|03)[0-9a-fA-F]{64}$/.test(q)) return 'pubkey'
+  if (/^[0-9a-fA-F]{96}$/.test(q)) return 'bls_pubkey'
   if (/^(kt|tk|rt)1p[ac-hj-np-z02-9]{58}$/.test(q)) return 'taproot'
   if (/^[1-9A-HJ-NP-Za-km-z]{33,36}$/.test(q)) return 'address'
   return 'unknown'

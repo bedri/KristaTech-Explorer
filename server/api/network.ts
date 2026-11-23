@@ -5,6 +5,7 @@ import { getCachedStatusData } from './status'
 import {
   calculateBlockSubsidy,
   calculateModelDSplits,
+  hasBip324ServiceFlag,
   maskPeerAddr,
   TARGET_BLOCK_TIME_SECONDS
 } from '../../app/utils/protocol'
@@ -77,6 +78,8 @@ export default defineEventHandler(async (event) => {
           addrMasked: maskPeerAddr(p.addr),
           version: p.version ?? 0,
           subver: p.subver || '',
+          services: p.services || '0',
+          bip324: hasBip324ServiceFlag(p.services),
           inbound: Boolean(p.inbound),
           syncedHeaders: p.synced_headers ?? -1,
           syncedBlocks: p.synced_blocks ?? -1,
@@ -87,6 +90,7 @@ export default defineEventHandler(async (event) => {
     } catch (_) {
       peers = []
     }
+    const bip324PeersCount = peers.filter((p) => p.bip324).length
 
     // Fetch protocol Sporks
     let sporks: any[] = []
@@ -112,10 +116,10 @@ export default defineEventHandler(async (event) => {
       {
         id: 'bootstrap',
         height: 1,
-        title: 'Fair Launch, KTDIP3 & UPGRADE_FAIRNESS',
-        titleTr: 'Adil Başlangıç, KTDIP3 ve UPGRADE_FAIRNESS',
-        desc: '0 premine, deterministic KTDIP3 Masternodes, Equal-Pay, PoM 1.25x / PoL 3x / PoB 6x & 4,200:250:10 Fair VRF.',
-        descTr: '0 ön madencilik, deterministik KTDIP3 Masternode, Eşit Ücret, PoM 1.25x / PoL 3x / PoB 6x ve 4.200:250:10 Adil VRF.'
+        title: 'Fair Launch, KTDIP3 (wallet.dat), BIP324 & UPGRADE_FAIRNESS',
+        titleTr: 'Adil Başlangıç, KTDIP3 (wallet.dat), BIP324 ve UPGRADE_FAIRNESS',
+        desc: '0 premine, deterministic KTDIP3 Masternodes (mnmeta, masternode.conf retired), BIP324 P2P v2, PoM 1.25x / PoL 3x / PoB 6x & 4,200:250:10 Proportional VRF.',
+        descTr: '0 ön madencilik, deterministik KTDIP3 Masternode (mnmeta, masternode.conf emekli), BIP324 P2P v2, PoM 1.25x / PoL 3x / PoB 6x ve 4.200:250:10 Orantılı VRF.'
       },
       {
         id: 'adam_v1',
@@ -146,8 +150,8 @@ export default defineEventHandler(async (event) => {
         height: 5000,
         title: 'UPGRADE_MODELD / ADAM v2 & Dynamic LLMQ',
         titleTr: 'UPGRADE_MODELD / ADAM v2 & Dinamik LLMQ',
-        desc: 'Dynamic BFT LLMQ (3/5–8/15, 1-block lag signer-only + -5/+5 PoSe), Equal-Pay 40%/11, PoS 12%/3% & Depth V2 (#5,001).',
-        descTr: 'Dinamik BFT LLMQ (3/5–8/15, 1-blok gecikmeli + -5/+5 PoSe), Eşit Ücret %40/11, PoS %12/%3 ve Depth V2 (#5.001).'
+        desc: 'Dynamic BFT LLMQ (3/5–8/15, 1-block lag signer-only + -5/+5 PoSe), Equal-Pay 40%/11, PoS 12%/3%, MESCAL v2 Taproot/PSBT & Stake Min Depth V2 (600 blks @ #5,001).',
+        descTr: 'Dinamik BFT LLMQ (3/5–8/15, 1-blok gecikmeli + -5/+5 PoSe), Eşit Ücret %40/11, PoS %12/%3, MESCAL v2 Taproot/PSBT ve Stake Min Derinlik V2 (600 blok @ #5.001).'
       },
       {
         id: 'phase_d',
@@ -176,6 +180,8 @@ export default defineEventHandler(async (event) => {
       difficulty: status.difficulty,
       posBlocksRecent: status.posBlocksRecent,
       powBlocksRecent: status.powBlocksRecent,
+      activeMnCount,
+      bip324PeersCount,
       modelDSplitsCurrent: calculateModelDSplits(currentHeight, undefined, activeMnCount),
       modelDSplitsFull: calculateModelDSplits(Math.max(5000, currentHeight), undefined, activeMnCount),
       blockSeries,

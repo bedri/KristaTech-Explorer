@@ -93,7 +93,7 @@ const supplyBar = computed(() => {
               Burned: {{ supplyBar.burnedPct }}%
             </span>
           </div>
-          <span class="font-mono text-slate-500">Hard Cap: 210,000,000 KRISTA • Premine: 0</span>
+          <span class="font-mono text-slate-500">~204.95M Asymptote (210M Hard Cap) • Premine: 0</span>
         </div>
         <div class="w-full h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
           <div class="bg-brand-blue h-full" :style="{ width: `${supplyBar.freePct}%` }"></div>

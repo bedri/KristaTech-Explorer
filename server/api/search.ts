@@ -45,6 +45,22 @@ export default defineEventHandler(async (event) => {
     return { success: false, error: 'Validator public key not found in active pool' }
   }
 
+  // 2b. Check for 96-hex KTDIP3 BLS12-381 Masternode Operator Public Key
+  if (/^[0-9a-fA-F]{96}$/.test(query)) {
+    const lowerBls = query.toLowerCase()
+    try {
+      const pool = await getValidatorPoolData()
+      const mnMatch = (pool.masternodes || []).find(
+        (m: any) => String(m.operatorPubKey || m.pubkey || '').toLowerCase() === lowerBls
+      )
+      const targetAddr = mnMatch?.ownerAddress || mnMatch?.addr
+      if (targetAddr) {
+        return { success: true, type: 'address', target: `/address/${targetAddr}` }
+      }
+    } catch (_) {}
+    return { success: false, error: 'BLS12-381 operator public key not found in masternode list' }
+  }
+
   // 3. Check for Hash (64 hex characters)
   if (/^[0-9a-fA-F]{64}$/.test(query)) {
     const lowerHash = query.toLowerCase()

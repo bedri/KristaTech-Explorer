@@ -111,7 +111,7 @@ export function buildOpenApiSpec(serverUrl = 'https://explorer.kristalteknoloji.
       '/api/network': {
         get: {
           tags: ['Chain Telemetry'],
-          summary: '60-block series, consensus roadmap, Model D splits, masked peer mesh, and Sporks',
+          summary: '60-block series, consensus roadmap, Model D splits, privacy-masked BIP324 v2 peer mesh, and Sporks',
           responses: {
             '200': { description: 'Network analytics payload' },
             '500': { description: 'Failed to load network analytics' }
@@ -121,7 +121,7 @@ export function buildOpenApiSpec(serverUrl = 'https://explorer.kristalteknoloji.
       '/api/search': {
         get: {
           tags: ['Chain Telemetry'],
-          summary: 'Smart search resolver for block height, block/tx hash, address, Taproot address, or validator pubkey',
+          summary: 'Smart search resolver for block height, block/tx hash, address, Taproot address, 66-hex validator pubkey, or 96-hex BLS12-381 operator pubkey',
           parameters: [
             {
               name: 'q',
@@ -186,6 +186,7 @@ export function buildOpenApiSpec(serverUrl = 'https://explorer.kristalteknoloji.
                   'coin_lock',
                   'pow_lock',
                   'zerocoin_pow',
+                  'protx',
                   'burn',
                   'contract'
                 ],
@@ -202,7 +203,7 @@ export function buildOpenApiSpec(serverUrl = 'https://explorer.kristalteknoloji.
       '/api/tx/{id}': {
         get: {
           tags: ['Ledger'],
-          summary: 'Full transaction details including inputs, enriched outputs, OP_RETURN decoding, and MESCAL decompilation',
+          summary: 'Full transaction details including inputs, enriched outputs, OP_RETURN / KTDIP3 ProTx decoding, and MESCAL decompilation',
           parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string', pattern: '^[0-9a-fA-F]{64}$' } }
           ],
@@ -355,6 +356,7 @@ export function buildOpenApiSpec(serverUrl = 'https://explorer.kristalteknoloji.
                   'coin_lock',
                   'pow_lock',
                   'zerocoin_pow',
+                  'protx',
                   'burn',
                   'contract'
                 ],
@@ -374,7 +376,7 @@ export function buildOpenApiSpec(serverUrl = 'https://explorer.kristalteknoloji.
       '/api/validators': {
         get: {
           tags: ['Consensus & Validators'],
-          summary: 'Active ADAM validator pool, Dual-Track quotas, KTDIP3 Masternodes, Fair VRF weights, and LLMQ Quorum',
+          summary: 'Active ADAM validator pool, Dual-Track quotas, deterministic KTDIP3 Masternodes (BLS12-381, PoSe), Fair VRF weights, and LLMQ Quorum',
           responses: {
             '200': { description: 'Validator pool telemetry' },
             '500': { description: 'Failed to fetch validator pool' }
@@ -391,7 +393,7 @@ export function buildOpenApiSpec(serverUrl = 'https://explorer.kristalteknoloji.
               in: 'path',
               required: true,
               schema: { type: 'string' },
-              description: 'Validator wallet address or 66-hex compressed public key'
+              description: 'Validator wallet address, 66-hex compressed public key, or 96-hex BLS12-381 operator public key'
             },
             {
               name: 'window',

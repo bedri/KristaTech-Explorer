@@ -29,13 +29,13 @@ const endpoints = [
   {
     method: 'GET',
     path: `/api/search?q=${SAMPLE_ADDR}`,
-    desc: 'Smart query resolver for block height, block/tx hash, wallet/Taproot address, or 66-hex validator pubkey.',
+    desc: 'Smart query resolver for block height, block/tx hash, wallet/Taproot address, 66-hex validator pubkey, or 96-hex BLS12-381 operator pubkey.',
     category: 'Chain Telemetry'
   },
   {
     method: 'GET',
     path: '/api/network',
-    desc: '60-block chart series, upgrade roadmap, Model D splits, privacy-masked peers, and Sporks.',
+    desc: '60-block chart series, upgrade roadmap, Model D splits, privacy-masked BIP324 v2 peers, and Sporks.',
     category: 'Chain Telemetry'
   },
   {
@@ -77,14 +77,14 @@ const endpoints = [
   {
     method: 'GET',
     path: '/api/transactions?page=1&limit=10&type=all',
-    desc: 'Paginated transaction stream filterable by standard, rewards, coin_lock, pow_lock, zerocoin_pow, burn, contract.',
+    desc: 'Paginated transaction stream filterable by standard, rewards, coin_lock, pow_lock, zerocoin_pow, protx (KTDIP3), burn, contract.',
     category: 'Ledger'
   },
   {
     method: 'GET',
     path: `/api/tx/${SAMPLE_TXID}`,
     displayPath: '/api/tx/{txid}',
-    desc: 'Full transaction breakdown with vin/vout, OP_RETURN decoding, MESCAL decompiler, and sat/B fee rate.',
+    desc: 'Full transaction breakdown with vin/vout, OP_RETURN & KTDIP3 ProTx decoding, MESCAL v2 decompiler, and sat/B fee rate.',
     category: 'Ledger',
     skipLiveTest: true
   },
@@ -138,13 +138,13 @@ const endpoints = [
   {
     method: 'GET',
     path: '/api/validators',
-    desc: 'Active ADAM validator pool, Dual-Track 7/1/3 Equal-Pay quotas, KTDIP3 Masternodes, 4,200:250:10 Fair Coordinator VRF (≥75% MN floor), and Dynamic LLMQ Quorum.',
+    desc: 'Active ADAM validator pool, Dual-Track 7/1/3 Equal-Pay quotas, KTDIP3 Masternodes (BLS12-381, PoSe), 4,200:250:10 Proportional VRF (≥75% MN floor), and Dynamic LLMQ Quorum.',
     category: 'Consensus & Validators'
   },
   {
     method: 'GET',
     path: `/api/validator/${SAMPLE_ADDR}?window=200`,
-    desc: 'Per-validator / Masternode performance analytics over a bounded block window (committee hit-rate, solve-rate, LLMQ, rewards).',
+    desc: 'Per-validator / Masternode performance analytics (by address, 66-hex secp256k1 pubkey, or 96-hex BLS12-381 operator pubkey) over a bounded block window.',
     category: 'Consensus & Validators'
   },
   {

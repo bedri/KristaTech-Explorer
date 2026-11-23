@@ -8,7 +8,8 @@ import {
   ADAM_COORD_WEIGHT_POW_LOCK,
   ADAM_MASTERNODE_TRACK_QUOTA,
   ADAM_OPEN_POW_TRACK_QUOTA,
-  calculateCoordinatorWeights
+  calculateCoordinatorWeights,
+  maskPeerAddr
 } from '../../app/utils/protocol'
 
 const VALIDATORS_CACHE_TTL_MS = 8_000
@@ -138,28 +139,121 @@ export async function getValidatorPoolData() {
     quorum = null
   }
 
+  let dip3List: any[] = []
+  try {
+    const protxRes = await callRpc('protx', ['list', 'detailed'])
+    if (Array.isArray(protxRes)) {
+      dip3List = protxRes
+    }
+  } catch (_) {
+    dip3List = []
+  }
+
+  const dip3ByProTx = new Map<string, any>()
+  const dip3ByOutpoint = new Map<string, any>()
+  for (const d of dip3List) {
+    if (d?.proTxHash) dip3ByProTx.set(String(d.proTxHash).toLowerCase(), d)
+    if (d?.collateralHash !== undefined && d?.collateralIndex !== undefined) {
+      dip3ByOutpoint.set(`${String(d.collateralHash).toLowerCase()}:${d.collateralIndex}`, d)
+    }
+  }
+
   let masternodes: any[] = []
+  const seenKeys = new Set<string>()
   try {
     const mnRes = await callRpc('listmasternodes')
     if (Array.isArray(mnRes)) {
-      masternodes = mnRes.map((mn: any, i: number) => ({
-        rank: mn.rank ?? i + 1,
-        addr: mn.addr || mn.address || '',
-        status: mn.status || 'ENABLED',
-        version: mn.version ?? 70983,
-        dip3: Boolean(mn.dip3),
-        proTxHash: mn.proTxHash || '',
-        registeredHeight: mn.registeredHeight ?? 0,
-        lastpaid: mn.lastpaid ?? 0,
-        pubkey: mn.pubkey || '',
-        txhash: mn.txhash || '',
-        outidx: mn.outidx ?? 0,
-        lastseen: mn.lastseen || 0,
-        activetime: mn.activetime || 0
-      }))
+      masternodes = mnRes.map((mn: any, i: number) => {
+        const proTx = String(mn.proTxHash || '').toLowerCase()
+        const outKey = `${String(mn.txhash || '').toLowerCase()}:${mn.outidx ?? 0}`
+        const dmn = (proTx ? dip3ByProTx.get(proTx) : null) || dip3ByOutpoint.get(outKey) || null
+        if (proTx) seenKeys.add(proTx)
+        if (mn.txhash) seenKeys.add(outKey)
+
+        const opRewardBps = typeof dmn?.operatorReward === 'number' ? dmn.operatorReward : 0
+        const operatorPubKey = dmn?.operatorPubKey || mn.pubkey || ''
+        const ownerAddress = dmn?.ownerAddress || mn.addr || mn.address || ''
+        const status =
+          mn.status ||
+          (dmn ? (dmn.valid ? 'ENABLED' : dmn.PoSeBanHeight > 0 ? 'POSE_BANNED' : 'EXPIRED') : 'ENABLED')
+
+        return {
+          rank: mn.rank ?? i + 1,
+          addr: ownerAddress,
+          ownerAddress,
+          payoutAddress: dmn?.payoutAddress || ownerAddress,
+          votingAddress: dmn?.votingAddress || ownerAddress,
+          status,
+          version: mn.version ?? 70983,
+          dip3: Boolean(mn.dip3 || dmn),
+          proTxHash: mn.proTxHash || dmn?.proTxHash || '',
+          registeredHeight: dmn?.registeredHeight ?? mn.registeredHeight ?? 0,
+          lastpaid: mn.lastpaid ?? dmn?.lastPaidHeight ?? 0,
+          lastPaidHeight: dmn?.lastPaidHeight ?? mn.lastpaid ?? 0,
+          pubkey: operatorPubKey,
+          operatorPubKey,
+          operatorRewardBps: opRewardBps,
+          operatorRewardPct: Math.round((opRewardBps / 100) * 100) / 100,
+          serviceMasked: dmn?.service ? maskPeerAddr(dmn.service) : mn.ip ? maskPeerAddr(mn.ip) : null,
+          posePenalty: dmn?.PoSePenalty ?? 0,
+          poseRevivedHeight: dmn?.PoSeRevivedHeight ?? -1,
+          poseBanHeight: dmn?.PoSeBanHeight ?? -1,
+          revocationReason: dmn?.revocationReason ?? 0,
+          valid: dmn ? Boolean(dmn.valid) : status === 'ENABLED',
+          txhash: mn.txhash || dmn?.collateralHash || '',
+          outidx: mn.outidx ?? dmn?.collateralIndex ?? 0,
+          lastseen: mn.lastseen || 0,
+          activetime: mn.activetime || 0
+        }
+      })
     }
   } catch (_) {
     masternodes = []
+  }
+
+  for (const dmn of dip3List) {
+    const proTx = String(dmn?.proTxHash || '').toLowerCase()
+    const outKey = `${String(dmn?.collateralHash || '').toLowerCase()}:${dmn?.collateralIndex ?? 0}`
+    if ((proTx && seenKeys.has(proTx)) || (dmn?.collateralHash && seenKeys.has(outKey))) {
+      continue
+    }
+    const opRewardBps = typeof dmn?.operatorReward === 'number' ? dmn.operatorReward : 0
+    const status = dmn?.valid ? 'ENABLED' : dmn?.PoSeBanHeight > 0 ? 'POSE_BANNED' : 'EXPIRED'
+    masternodes.push({
+      rank: 0,
+      addr: dmn?.ownerAddress || '',
+      ownerAddress: dmn?.ownerAddress || '',
+      payoutAddress: dmn?.payoutAddress || dmn?.ownerAddress || '',
+      votingAddress: dmn?.votingAddress || dmn?.ownerAddress || '',
+      status,
+      version: 70983,
+      dip3: true,
+      proTxHash: dmn?.proTxHash || '',
+      registeredHeight: dmn?.registeredHeight ?? 0,
+      lastpaid: dmn?.lastPaidHeight ?? 0,
+      lastPaidHeight: dmn?.lastPaidHeight ?? 0,
+      pubkey: dmn?.operatorPubKey || '',
+      operatorPubKey: dmn?.operatorPubKey || '',
+      operatorRewardBps: opRewardBps,
+      operatorRewardPct: Math.round((opRewardBps / 100) * 100) / 100,
+      serviceMasked: dmn?.service ? maskPeerAddr(dmn.service) : null,
+      posePenalty: dmn?.PoSePenalty ?? 0,
+      poseRevivedHeight: dmn?.PoSeRevivedHeight ?? -1,
+      poseBanHeight: dmn?.PoSeBanHeight ?? -1,
+      revocationReason: dmn?.revocationReason ?? 0,
+      valid: Boolean(dmn?.valid),
+      txhash: dmn?.collateralHash || '',
+      outidx: dmn?.collateralIndex ?? 0,
+      lastseen: 0,
+      activetime: 0
+    })
+  }
+
+  const masternodeStats = {
+    total: masternodes.length,
+    enabled: masternodes.filter((m) => m.status === 'ENABLED').length,
+    dip3: masternodes.filter((m) => m.dip3).length,
+    poseBanned: masternodes.filter((m) => m.status === 'POSE_BANNED').length
   }
 
   const openPowAvailable = summary.pow_lock + summary.zerocoin_pow + summary.bootstrap
@@ -195,6 +289,7 @@ export async function getValidatorPoolData() {
     coordinatorVrf,
     validators,
     quorum,
+    masternodeStats,
     masternodes
   }
 

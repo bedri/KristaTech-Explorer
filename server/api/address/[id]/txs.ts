@@ -18,6 +18,7 @@ const VALID_FILTERS = new Set([
   'coin_lock',
   'pow_lock',
   'zerocoin_pow',
+  'protx',
   'burn',
   'contract'
 ])
@@ -65,7 +66,7 @@ export default defineEventHandler(async (event) => {
     if (filter === 'rewards') {
       outerWhereParts.push("tx_type IN ('coinbase', 'coinstake')")
     } else if (filter === 'registrations') {
-      outerWhereParts.push("tx_type IN ('coin_lock', 'pow_lock', 'zerocoin_pow')")
+      outerWhereParts.push("tx_type IN ('coin_lock', 'pow_lock', 'zerocoin_pow', 'protx')")
     } else if (filter !== 'all') {
       outerWhereParts.push('tx_type = ?')
       outerParams.push(filter)

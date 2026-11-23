@@ -70,6 +70,8 @@ const detectedTypeLabel = computed(() => {
       return t('searchTypeTaproot')
     case 'pubkey':
       return t('searchTypePubkey')
+    case 'bls_pubkey':
+      return t('searchTypeBlsPubkey')
     default:
       return ''
   }
@@ -439,7 +441,7 @@ onUnmounted(() => {
               </span>
             </div>
             <p class="text-xs text-slate-500 dark:text-slate-400">
-              Fair Launch • Zero Premine • ADAM Dual-Track (7 MN / 1 Coin-Lock / 3 Open PoW) • 4,200:250:10 Fair VRF (≥75% MN Floor) • KTDIP3
+              Fair Launch • Zero Premine • ADAM 7+1+3 • 4,200:250:10 Proportional VRF (≥75% MN Floor) • KTDIP3 (wallet.dat) • MESCAL v2 • BIP324
             </p>
           </div>
 
@@ -450,6 +452,30 @@ onUnmounted(() => {
             <NuxtLink to="/richlist" class="hover:text-brand-blue transition-colors">{{ t('navRichList') }}</NuxtLink>
             <NuxtLink to="/network" class="hover:text-brand-blue transition-colors">{{ t('navNetwork') }}</NuxtLink>
             <NuxtLink to="/api-docs" class="hover:text-brand-blue transition-colors">{{ t('navApi') }}</NuxtLink>
+            <a
+              :href="locale === 'tr' ? 'https://github.com/bedri/KristaTech-KRISTA/blob/develop/doc/Whitepaper_TR.md' : 'https://github.com/bedri/KristaTech-KRISTA/blob/develop/doc/Whitepaper.md'"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hover:text-brand-blue transition-colors"
+            >
+              Whitepaper ↗
+            </a>
+            <a
+              :href="locale === 'tr' ? 'https://github.com/bedri/KristaTech-KRISTA/blob/develop/doc/ADAM_Consensus_TR.md' : 'https://github.com/bedri/KristaTech-KRISTA/blob/develop/doc/ADAM_Consensus.md'"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hover:text-brand-blue transition-colors"
+            >
+              ADAM Docs ↗
+            </a>
+            <a
+              :href="locale === 'tr' ? 'https://github.com/bedri/KristaTech-KRISTA/blob/develop/doc/MESCAL_TR.md' : 'https://github.com/bedri/KristaTech-KRISTA/blob/develop/doc/MESCAL.md'"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hover:text-brand-blue transition-colors"
+            >
+              MESCAL Docs ↗
+            </a>
             <a
               href="https://krista.kristalteknoloji.com"
               target="_blank"

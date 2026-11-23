@@ -152,6 +152,80 @@ function isClickableAddress(addr) {
         </div>
       </div>
 
+      <!-- KTDIP3 ProTx Deterministic Masternode Card -->
+      <div
+        v-if="txResult.proTx || txResult.proTxInfo"
+        class="glass-card rounded-2xl p-6 space-y-4 border border-cyan-500/30"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="space-y-0.5">
+            <h2 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <span>🛡️ {{ t('ktdip3Details') }}</span>
+            </h2>
+            <p v-if="txResult.proTx" class="text-xs font-semibold text-cyan-600 dark:text-cyan-300">
+              {{ locale === 'tr' ? txResult.proTx.labelTr : txResult.proTx.label }}
+              <span v-if="txResult.proTx.version !== null" class="font-mono text-slate-500 ml-1">
+                (v{{ txResult.proTx.version }})
+              </span>
+            </p>
+          </div>
+          <div v-if="txResult.proTxInfo" class="flex items-center gap-2 text-xs">
+            <span
+              class="px-2.5 py-0.5 rounded font-semibold"
+              :class="txResult.proTxInfo.valid ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-red-500/15 text-red-700 dark:text-red-300'"
+            >
+              {{ txResult.proTxInfo.valid ? 'ACTIVE' : 'INACTIVE' }}
+            </span>
+            <span class="px-2.5 py-0.5 rounded bg-slate-100 dark:bg-white/5 font-mono text-slate-600 dark:text-slate-300">
+              {{ t('posePenaltyLabel') }}: {{ txResult.proTxInfo.posePenalty }}/100
+            </span>
+          </div>
+        </div>
+
+        <div v-if="txResult.proTxInfo" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+          <div class="p-3 rounded-xl bg-slate-100/80 dark:bg-white/5 space-y-1">
+            <p class="text-slate-500">{{ t('ownerAddressLabel') }}</p>
+            <NuxtLink
+              v-if="txResult.proTxInfo.ownerAddress"
+              :to="`/address/${txResult.proTxInfo.ownerAddress}`"
+              class="font-mono font-semibold text-brand-salmon hover:underline break-all"
+            >
+              {{ txResult.proTxInfo.ownerAddress }}
+            </NuxtLink>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-100/80 dark:bg-white/5 space-y-1">
+            <p class="text-slate-500">{{ t('payoutAddressLabel') }}</p>
+            <NuxtLink
+              v-if="txResult.proTxInfo.payoutAddress"
+              :to="`/address/${txResult.proTxInfo.payoutAddress}`"
+              class="font-mono font-semibold text-brand-blue hover:underline break-all"
+            >
+              {{ txResult.proTxInfo.payoutAddress }}
+            </NuxtLink>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-100/80 dark:bg-white/5 space-y-1">
+            <p class="text-slate-500">{{ t('votingAddressLabel') }}</p>
+            <NuxtLink
+              v-if="txResult.proTxInfo.votingAddress"
+              :to="`/address/${txResult.proTxInfo.votingAddress}`"
+              class="font-mono font-semibold text-slate-700 dark:text-slate-200 hover:underline break-all"
+            >
+              {{ txResult.proTxInfo.votingAddress }}
+            </NuxtLink>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-100/80 dark:bg-white/5 space-y-1 md:col-span-2">
+            <p class="text-slate-500">{{ t('operatorPubKeyLabel') }}</p>
+            <p class="font-mono text-slate-700 dark:text-slate-200 break-all">{{ txResult.proTxInfo.operatorPubKey }}</p>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-100/80 dark:bg-white/5 space-y-1">
+            <p class="text-slate-500">Service (Masked) / Meta</p>
+            <p class="font-mono text-slate-700 dark:text-slate-200">
+              {{ txResult.proTxInfo.serviceMasked || '—' }} • #{{ txResult.proTxInfo.registeredHeight }} • OpFee {{ txResult.proTxInfo.operatorRewardPct }}%
+            </p>
+          </div>
+        </div>
+      </div>
+
       <!-- Inputs & Outputs Flow -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 relative">
         <!-- Left: Inputs -->
@@ -231,6 +305,9 @@ function isClickableAddress(addr) {
                     <span v-else-if="output.script_type === 'witness_v1_taproot' || output.script_type === 'mescalcontract'" class="px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold">
                       📜 {{ t('taprootContract') }}
                     </span>
+                    <span v-else-if="output.proTxDecoded" class="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 text-[11px] font-semibold">
+                      🛡️ {{ t('proTxBadge') }}
+                    </span>
                     <span v-else-if="output.script_type === 'nulldata' || output.address === 'OP_RETURN'" class="px-2 py-0.5 rounded bg-slate-500/15 text-slate-600 dark:text-slate-300 text-[11px] font-mono font-semibold">
                       {{ t('opReturnBadge') }}
                     </span>
@@ -273,7 +350,17 @@ function isClickableAddress(addr) {
               </div>
 
               <!-- Decoded OP_RETURN Payload -->
-              <div v-if="output.opReturnDecoded" class="p-3 rounded-lg bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-white/10 space-y-1 text-xs">
+              <div v-if="output.proTxDecoded" class="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20 space-y-1 text-xs">
+                <div class="font-semibold text-cyan-700 dark:text-cyan-300">
+                  🛡️ {{ locale === 'tr' ? output.proTxDecoded.labelTr : output.proTxDecoded.label }}
+                </div>
+                <p class="font-mono text-slate-500">
+                  Magic: {{ output.proTxDecoded.magic }} • Type: 0x0{{ output.proTxDecoded.code }}
+                  <span v-if="output.proTxDecoded.version !== null"> • v{{ output.proTxDecoded.version }}</span>
+                  • {{ output.proTxDecoded.payloadBytes }} B
+                </p>
+              </div>
+              <div v-else-if="output.opReturnDecoded" class="p-3 rounded-lg bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-white/10 space-y-1 text-xs">
                 <div class="font-semibold text-slate-600 dark:text-slate-300">{{ t('decodedOpReturn') }}</div>
                 <p v-if="output.opReturnDecoded.utf8Text" class="font-mono text-emerald-700 dark:text-emerald-300 break-all">
                   UTF-8: "{{ output.opReturnDecoded.utf8Text }}"

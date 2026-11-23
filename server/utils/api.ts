@@ -26,6 +26,10 @@ export function isValidCompressedPubkey(val: string): boolean {
   return /^(02|03)[0-9a-fA-F]{64}$/.test(val || '')
 }
 
+export function isValidBlsPubkey(val: string): boolean {
+  return /^[0-9a-fA-F]{96}$/.test(val || '')
+}
+
 export function toSatoshi(amount: number | null | undefined): number {
   return Math.round((amount || 0) * 1e8)
 }

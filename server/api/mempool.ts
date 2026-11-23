@@ -1,6 +1,7 @@
 import { callRpc, callRpcBatch } from '../utils/rpc'
 import { isBurnAddress, normalizeTaprootAddress } from '../utils/db'
 import { setCacheControl } from '../utils/api'
+import { decodeKtdip3ProTxAsm } from '../../app/utils/formatters'
 
 const MEMPOOL_CACHE_TTL_MS = 3000
 let cachedMempool: any = null
@@ -22,6 +23,7 @@ function classifyRawMempoolTx(rawTx: any): { txType: string; totalOut: number } 
   let hasCoinLock = false
   let hasPowLock = false
   let hasZeroCoin = false
+  let hasProTx = false
   let hasBurn = false
   let hasContract = false
 
@@ -42,6 +44,7 @@ function classifyRawMempoolTx(rawTx: any): { txType: string; totalOut: number } 
       if (st === 'adam_coinlock') hasCoinLock = true
       else if (st === 'adam_powlock') hasPowLock = true
       else if (st === 'mescalcontract' || st === 'witness_v1_taproot') hasContract = true
+      else if (st === 'nulldata' && decodeKtdip3ProTxAsm(out?.scriptPubKey?.asm) !== null) hasProTx = true
       if (isBurnAddress(normalizeTaprootAddress(addr)) && sats > 0) hasBurn = true
     }
   }
@@ -50,6 +53,7 @@ function classifyRawMempoolTx(rawTx: any): { txType: string; totalOut: number } 
   if (hasCoinLock) txType = 'coin_lock'
   else if (hasZeroCoin) txType = 'zerocoin_pow'
   else if (hasPowLock) txType = 'pow_lock'
+  else if (hasProTx) txType = 'protx'
   else if (hasBurn) txType = 'burn'
   else if (hasContract) txType = 'contract'
 

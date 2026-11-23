@@ -10,6 +10,7 @@ import {
 } from '../utils/db'
 import { publishExplorerEvent, setMempoolFetcher } from '../utils/events'
 import { incrementReorgCount, updateIndexerState } from '../utils/indexerState'
+import { decodeKtdip3ProTxAsm } from '../../app/utils/formatters'
 
 let isSyncing = false
 let hasBackfilledLegacy = false
@@ -163,6 +164,7 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
     let hasCoinLock = false
     let hasPowLock = false
     let hasZeroCoinSentinel = false
+    let hasProTxOutput = false
     let hasBurnOutput = false
     let hasContractOutput = false
 
@@ -203,6 +205,10 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
         lockHeight = extractCltvLockHeight(scriptAsm)
       } else if (scriptType === 'mescalcontract' || scriptType === 'witness_v1_taproot') {
         hasContractOutput = true
+      }
+
+      if (scriptType === 'nulldata' && decodeKtdip3ProTxAsm(scriptAsm) !== null) {
+        hasProTxOutput = true
       }
 
       if (isBurnAddress(address) && outSats > 0) {
@@ -292,6 +298,7 @@ async function insertBlockAndTxs(block: any, txMap: Map<string, any>): Promise<v
     else if (hasCoinLock) txType = 'coin_lock'
     else if (hasZeroCoinSentinel) txType = 'zerocoin_pow'
     else if (hasPowLock) txType = 'pow_lock'
+    else if (hasProTxOutput) txType = 'protx'
     else if (hasBurnOutput) txType = 'burn'
     else if (hasContractOutput) txType = 'contract'
 

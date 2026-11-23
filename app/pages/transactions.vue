@@ -55,6 +55,7 @@ const categoryPills = computed(() => {
     { key: 'coin_lock', label: '🔒 250 Lock', count: c.coin_lock || 0 },
     { key: 'pow_lock', label: '⚡ 10 PoW', count: c.pow_lock || 0 },
     { key: 'zerocoin_pow', label: '🌱 Zero-Coin', count: c.zerocoin_pow || 0 },
+    { key: 'protx', label: `🛡️ ${t('filterProTx')}`, count: c.protx || 0 },
     { key: 'burn', label: `🔥 ${t('filterBurns')}`, count: c.burn || 0 },
     { key: 'contract', label: `📜 ${t('filterContracts')}`, count: c.contract || 0 }
   ]

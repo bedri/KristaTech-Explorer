@@ -27,7 +27,7 @@ const filteredLatestTxs = computed(() => {
   }
   if (txQuickFilter.value === 'registrations') {
     return list
-      .filter((tx) => ['coin_lock', 'pow_lock', 'zerocoin_pow'].includes(tx.txType))
+      .filter((tx) => ['coin_lock', 'pow_lock', 'zerocoin_pow', 'protx'].includes(tx.txType))
       .slice(0, 10)
   }
   return list.filter((tx) => tx.txType === txQuickFilter.value).slice(0, 10)

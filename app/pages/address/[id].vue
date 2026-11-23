@@ -173,6 +173,14 @@ function exportTransactionsCsv() {
               >
                 ✓ LLMQ Rank #{{ addressResult.quorumMember.rank }}
               </span>
+
+              <span
+                v-for="(mr, mrIdx) in addressResult.masternodeRoles || []"
+                :key="`mr-${mrIdx}`"
+                class="text-xs font-semibold px-2.5 py-0.5 rounded bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
+              >
+                KTDIP3 {{ mr.roles.join(' / ') }} ({{ mr.status }})
+              </span>
             </div>
 
             <h1 class="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-800 dark:text-white font-mono break-all">
@@ -441,6 +449,38 @@ function exportTransactionsCsv() {
                 <div class="font-semibold text-slate-800 dark:text-white">
                   {{ t('vrfTickets') }}: {{ ve.vrfTickets }} ({{ ve.vrfSeatPct }}%)
                   <span v-if="ve.unlock_height > 0">• Unlock #{{ ve.unlock_height }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="addressResult.masternodeRoles?.length" class="space-y-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
+                🛡️ {{ t('masternodeRolesTitle') }}
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div
+                  v-for="(mr, idx) in addressResult.masternodeRoles"
+                  :key="`tab-mr-${idx}`"
+                  class="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/25 space-y-1.5 text-xs"
+                >
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="font-bold text-cyan-700 dark:text-cyan-300 uppercase">
+                      {{ mr.roles.join(' / ') }} • {{ mr.status }}
+                    </span>
+                    <span class="font-mono text-slate-500">PoSe {{ mr.posePenalty }}/100</span>
+                  </div>
+                  <div v-if="mr.proTxHash" class="font-mono break-all">
+                    ProTx:
+                    <NuxtLink :to="`/tx/${mr.proTxHash}`" class="text-brand-blue hover:underline">
+                      {{ shortenHash(mr.proTxHash, 10) }}
+                    </NuxtLink>
+                  </div>
+                  <div v-if="mr.payoutAddress" class="font-mono break-all text-slate-600 dark:text-slate-300">
+                    {{ t('payoutAddressLabel') }}: {{ mr.payoutAddress }}
+                  </div>
+                  <div v-if="mr.operatorPubKey" class="font-mono break-all text-slate-500">
+                    BLS: {{ shortenHash(mr.operatorPubKey, 10) }}
+                  </div>
                 </div>
               </div>
             </div>

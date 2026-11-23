@@ -441,31 +441,80 @@ function trackLabel(track) {
 
       <!-- TAB 3: Masternode Registry -->
       <div role="tabpanel" aria-labelledby="val-tab-masternodes" :hidden="activeTab !== 'masternodes' ? true : undefined">
-        <div class="glass-card rounded-2xl p-6">
+        <div class="glass-card rounded-2xl p-6 space-y-4">
+          <div v-if="valData?.masternodeStats" class="flex flex-wrap items-center gap-3 text-xs">
+            <span class="px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-700 dark:text-purple-300 font-semibold">
+              Total: {{ valData.masternodeStats.total }}
+            </span>
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold">
+              Enabled: {{ valData.masternodeStats.enabled }}
+            </span>
+            <span class="px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-300 font-semibold">
+              KTDIP3: {{ valData.masternodeStats.dip3 }}
+            </span>
+            <span
+              v-if="valData.masternodeStats.poseBanned > 0"
+              class="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-700 dark:text-red-300 font-semibold"
+            >
+              PoSe Banned: {{ valData.masternodeStats.poseBanned }}
+            </span>
+          </div>
+
           <div v-if="valData?.masternodes?.length" tabindex="0" role="region" aria-label="Masternode Registry" class="table-wrapper">
             <table class="text-left text-sm">
               <thead class="bg-slate-100 dark:bg-slate-900/95 text-slate-700 dark:text-gray-300 font-semibold uppercase text-xs">
                 <tr>
                   <th scope="col" class="p-3.5">{{ t('rank') }}</th>
-                  <th scope="col" class="p-3.5">{{ t('holderAddress') }}</th>
-                  <th scope="col" class="p-3.5">Collateral</th>
-                  <th scope="col" class="p-3.5">{{ t('version') }}</th>
+                  <th scope="col" class="p-3.5">{{ t('ownerAddressLabel') }} / {{ t('payoutAddressLabel') }}</th>
+                  <th scope="col" class="p-3.5">ProTx / Collateral</th>
+                  <th scope="col" class="p-3.5">{{ t('operatorPubKeyLabel') }}</th>
+                  <th scope="col" class="p-3.5">Reg / {{ t('posePenaltyLabel') }}</th>
                   <th scope="col" class="p-3.5 text-right">Status</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200/60 dark:divide-white/5">
-                <tr v-for="mn in valData.masternodes" :key="`${mn.txhash}-${mn.outidx}`">
+                <tr v-for="mn in valData.masternodes" :key="`${mn.proTxHash || mn.txhash}-${mn.outidx}`">
                   <td class="p-3.5 font-mono">#{{ mn.rank }}</td>
-                  <td class="p-3.5 font-mono text-xs sm:text-sm">
-                    <NuxtLink :to="`/address/${mn.addr}`" class="text-brand-salmon font-semibold hover:underline">{{ mn.addr }}</NuxtLink>
+                  <td class="p-3.5 font-mono text-xs sm:text-sm space-y-0.5">
+                    <div>
+                      <NuxtLink :to="`/address/${mn.ownerAddress || mn.addr}`" class="text-brand-salmon font-semibold hover:underline">
+                        {{ mn.ownerAddress || mn.addr }}
+                      </NuxtLink>
+                    </div>
+                    <div v-if="mn.payoutAddress && mn.payoutAddress !== (mn.ownerAddress || mn.addr)" class="text-[11px] text-slate-500">
+                      → Pay:
+                      <NuxtLink :to="`/address/${mn.payoutAddress}`" class="text-brand-blue hover:underline">
+                        {{ shortenHash(mn.payoutAddress, 8) }}
+                      </NuxtLink>
+                    </div>
                   </td>
-                  <td class="p-3.5 font-mono text-xs">
-                    <NuxtLink v-if="mn.txhash" :to="`/tx/${mn.txhash}`" class="text-brand-blue hover:underline">
-                      {{ shortenHash(mn.txhash, 8) }}:{{ mn.outidx }}
-                    </NuxtLink>
+                  <td class="p-3.5 font-mono text-xs space-y-0.5">
+                    <div v-if="mn.proTxHash">
+                      <NuxtLink :to="`/tx/${mn.proTxHash}`" class="text-cyan-600 dark:text-cyan-300 hover:underline font-semibold">
+                        ProTx: {{ shortenHash(mn.proTxHash, 8) }}
+                      </NuxtLink>
+                    </div>
+                    <div v-if="mn.txhash">
+                      <NuxtLink :to="`/tx/${mn.txhash}`" class="text-brand-blue hover:underline">
+                        Col: {{ shortenHash(mn.txhash, 6) }}:{{ mn.outidx }}
+                      </NuxtLink>
+                    </div>
                   </td>
-                  <td class="p-3.5 font-mono text-xs">{{ mn.version }}</td>
-                  <td class="p-3.5 text-right space-x-1.5">
+                  <td class="p-3.5 font-mono text-xs space-y-0.5">
+                    <div class="text-slate-600 dark:text-slate-300" :title="mn.operatorPubKey || mn.pubkey">
+                      {{ shortenHash(mn.operatorPubKey || mn.pubkey, 8) }}
+                    </div>
+                    <div v-if="mn.serviceMasked" class="text-[11px] text-slate-400">
+                      {{ mn.serviceMasked }}
+                    </div>
+                  </td>
+                  <td class="p-3.5 font-mono text-xs whitespace-nowrap">
+                    <div>#{{ mn.registeredHeight || 0 }}</div>
+                    <div class="text-[11px]" :class="(mn.posePenalty || 0) > 0 ? 'text-amber-600 dark:text-amber-300 font-semibold' : 'text-slate-400'">
+                      PoSe {{ mn.posePenalty ?? 0 }}/100
+                    </div>
+                  </td>
+                  <td class="p-3.5 text-right space-x-1.5 whitespace-nowrap">
                     <span
                       v-if="mn.dip3"
                       class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-700 dark:text-sky-300 text-xs font-semibold"

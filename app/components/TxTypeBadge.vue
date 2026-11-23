@@ -42,6 +42,12 @@ const { t } = useI18n()
     🌱 {{ t('trackZeroCoin') }}
   </span>
   <span
+    v-else-if="props.txType === 'protx'"
+    class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/25 text-cyan-700 dark:text-cyan-300 text-[10px] font-sans font-semibold whitespace-nowrap"
+  >
+    🛡️ {{ t('proTxBadge') }}
+  </span>
+  <span
     v-else-if="props.txType === 'burn'"
     class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/25 text-orange-700 dark:text-orange-300 text-[10px] font-sans font-semibold whitespace-nowrap"
   >

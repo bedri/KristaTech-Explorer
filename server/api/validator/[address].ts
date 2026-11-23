@@ -4,6 +4,7 @@ import {
   BoundedTtlCache,
   fromSatoshi,
   isValidAddressParam,
+  isValidBlsPubkey,
   isValidCompressedPubkey,
   setCacheControl,
   toSatoshi
@@ -22,14 +23,16 @@ export default defineEventHandler(async (event) => {
     Math.max(10, Number.isFinite(parsedWindow) && parsedWindow > 0 ? parsedWindow : 200)
   )
 
-  const isPubkey = isValidCompressedPubkey(rawParam)
+  const isSecpPubkey = isValidCompressedPubkey(rawParam)
+  const isBlsPubkey = isValidBlsPubkey(rawParam)
+  const isPubkey = isSecpPubkey || isBlsPubkey
   const normalizedAddr = isPubkey ? '' : normalizeTaprootAddress(rawParam)
 
   if (!isPubkey && !isValidAddressParam(normalizedAddr)) {
     return apiError(
       event,
       400,
-      'Invalid validator address or compressed public key format',
+      'Invalid validator address, 66-hex secp256k1 pubkey, or 96-hex BLS12-381 operator pubkey format',
       'INVALID_VALIDATOR_ID'
     )
   }
@@ -48,9 +51,15 @@ export default defineEventHandler(async (event) => {
         (m: any) => String(m.pubkey || '').toLowerCase() === lowerPub
       )
       const mnMatch = (pool.masternodes || []).find(
-        (m: any) => String(m.pubkey || '').toLowerCase() === lowerPub
+        (m: any) =>
+          String(m.operatorPubKey || m.pubkey || '').toLowerCase() === lowerPub
       )
-      resolvedAddress = valMatch?.address || qMatch?.addr || mnMatch?.addr || ''
+      resolvedAddress =
+        valMatch?.address ||
+        qMatch?.addr ||
+        mnMatch?.ownerAddress ||
+        mnMatch?.addr ||
+        ''
       if (!resolvedAddress) {
         return apiError(
           event,
@@ -104,7 +113,12 @@ export default defineEventHandler(async (event) => {
         (v: any) => v.address === resolvedAddress
       )
       const masternodeEntry =
-        (pool.masternodes || []).find((m: any) => m.addr === resolvedAddress) || null
+        (pool.masternodes || []).find(
+          (m: any) =>
+            m.ownerAddress === resolvedAddress ||
+            m.payoutAddress === resolvedAddress ||
+            m.addr === resolvedAddress
+        ) || null
       const quorumMember =
         (pool.quorum?.members || []).find((m: any) => m.addr === resolvedAddress) || null
 

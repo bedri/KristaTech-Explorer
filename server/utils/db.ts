@@ -273,6 +273,26 @@ export function ensureDb(): Promise<sqlite3.Database> {
       }
     } catch (_) {}
 
+    // KTDIP3 Migration: reclassify any previously indexed ProTx transactions from 'standard' to 'protx'
+    try {
+      await runRaw(
+        db,
+        `UPDATE transactions
+         SET tx_type = 'protx'
+         WHERE tx_type = 'standard'
+           AND txid IN (
+             SELECT txid FROM vout
+             WHERE script_type = 'nulldata'
+               AND (
+                 script_asm LIKE 'OP_RETURN 4b544449503301%' OR
+                 script_asm LIKE 'OP_RETURN 4b544449503302%' OR
+                 script_asm LIKE 'OP_RETURN 4b544449503303%' OR
+                 script_asm LIKE 'OP_RETURN 4b544449503304%'
+               )
+           )`
+      )
+    } catch (_) {}
+
     dbInstance = db
     return db
   })().catch((err) => {
