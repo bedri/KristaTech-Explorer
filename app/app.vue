@@ -160,7 +160,12 @@ onMounted(() => {
   window.addEventListener('click', closeDropdown)
   window.addEventListener('keydown', handleGlobalKeydown)
 
-  const localeCookie = useCookie('explorer_locale')
+  const localeCookie = useCookie('explorer_locale', {
+    sameSite: 'lax',
+    secure: !import.meta.dev,
+    maxAge: 60 * 60 * 24 * 365,
+    path: '/'
+  })
   if (!localeCookie.value) {
     const browserLang = navigator.language.slice(0, 2)
     if (languages.some((l) => l.code === browserLang)) {

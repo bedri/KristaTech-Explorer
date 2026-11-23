@@ -4,6 +4,15 @@ import {
   validateRawTxHex
 } from '../../utils/rpc'
 import { apiError, setCacheControl } from '../../utils/api'
+import { isContentLengthExceeded } from '../../utils/security'
+
+function sanitizeBroadcastError(raw: string): string {
+  return raw
+    .replace(/^RPC Error:\s*/, '')
+    .replace(/[\x00-\x1f\x7f]/g, ' ')
+    .trim()
+    .slice(0, 240)
+}
 
 export default defineEventHandler(async (event) => {
   setCacheControl(event, 0)
@@ -11,6 +20,10 @@ export default defineEventHandler(async (event) => {
   if (event.method !== 'POST') {
     setResponseHeader(event, 'Allow', 'POST, OPTIONS')
     return apiError(event, 405, 'Method Not Allowed. Use POST with JSON { hex }.', 'METHOD_NOT_ALLOWED')
+  }
+
+  if (isContentLengthExceeded(getRequestHeader(event, 'content-length'))) {
+    return apiError(event, 413, 'Request payload exceeds 256 KB limit', 'PAYLOAD_TOO_LARGE')
   }
 
   const config = useRuntimeConfig()
@@ -51,7 +64,7 @@ export default defineEventHandler(async (event) => {
       return apiError(
         event,
         400,
-        msg.replace(/^RPC Error:\s*/, ''),
+        sanitizeBroadcastError(msg) || 'Transaction rejected by node',
         'TX_REJECTED'
       )
     }

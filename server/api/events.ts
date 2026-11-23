@@ -1,6 +1,7 @@
 import { callRpc } from '../utils/rpc'
 import { dbGet } from '../utils/db'
 import { API_VERSION, apiError } from '../utils/api'
+import { resolveClientIp } from '../utils/security'
 import {
   formatSseFrame,
   parseTopicsParam,
@@ -8,24 +9,16 @@ import {
   setMempoolFetcher
 } from '../utils/events'
 
-function getClientIp(event: any): string {
-  const xff = getRequestHeader(event, 'x-forwarded-for')
-  if (xff) {
-    return xff.split(',')[0].trim()
-  }
-  const realIp = getRequestHeader(event, 'x-real-ip')
-  if (realIp) {
-    return realIp.trim()
-  }
-  return event.node?.req?.socket?.remoteAddress || '127.0.0.1'
-}
-
 export default defineEventHandler(async (event) => {
   setMempoolFetcher(() => callRpc('getrawmempool', [false]))
 
   const query = getQuery(event)
   const topics = parseTopicsParam(query.topics ? String(query.topics) : undefined)
-  const ip = getClientIp(event)
+  const { ip } = resolveClientIp({
+    xRealIp: getRequestHeader(event, 'x-real-ip'),
+    xForwardedFor: getRequestHeader(event, 'x-forwarded-for'),
+    remoteAddress: event.node?.req?.socket?.remoteAddress
+  })
 
   const res = event.node.res
   const req = event.node.req

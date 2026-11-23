@@ -1,6 +1,7 @@
 import { callRpc, validateRawTxHex } from '../../utils/rpc'
 import { isBurnAddress, normalizeTaprootAddress } from '../../utils/db'
 import { apiError, normalizeAmount, setCacheControl } from '../../utils/api'
+import { isContentLengthExceeded } from '../../utils/security'
 import { decodeOpReturnAsm } from '../../../app/utils/formatters'
 
 export default defineEventHandler(async (event) => {
@@ -9,6 +10,10 @@ export default defineEventHandler(async (event) => {
   if (event.method !== 'POST') {
     setResponseHeader(event, 'Allow', 'POST, OPTIONS')
     return apiError(event, 405, 'Method Not Allowed. Use POST with JSON { hex }.', 'METHOD_NOT_ALLOWED')
+  }
+
+  if (isContentLengthExceeded(getRequestHeader(event, 'content-length'))) {
+    return apiError(event, 413, 'Request payload exceeds 256 KB limit', 'PAYLOAD_TOO_LARGE')
   }
 
   let body: any = null

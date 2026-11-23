@@ -1,13 +1,27 @@
 import { callRpc, callRpcBatch } from '../utils/rpc'
-import { isBurnAddress, normalizeTaprootAddress } from '../utils/db'
-import { setCacheControl } from '../utils/api'
+import { dbQuery, isBurnAddress, normalizeTaprootAddress } from '../utils/db'
+import { setCacheControl, toSatoshi } from '../utils/api'
 import { decodeKtdip3ProTxAsm } from '../../app/utils/formatters'
 
+export interface MempoolAddressDelta {
+  receivedSats: number
+  sentSats: number
+  txCount: number
+}
+
+interface MempoolSnapshotResult {
+  payload: any
+  rawTxMap: Map<string, any>
+  addressDeltas: Map<string, MempoolAddressDelta>
+}
+
 const MEMPOOL_CACHE_TTL_MS = 3000
+const MAX_MEMPOOL_PREVOUT_LOOKUPS = 500
 let cachedMempool: any = null
 let cachedMempoolTime = 0
 let cachedMempoolRawTxs: Map<string, any> = new Map()
-let inflightMempoolPromise: Promise<{ payload: any; rawTxMap: Map<string, any> }> | null = null
+let cachedAddressDeltas: Map<string, MempoolAddressDelta> = new Map()
+let inflightMempoolPromise: Promise<MempoolSnapshotResult> | null = null
 
 const ZERO_COIN_SENTINEL_TXID = '0000000000000000000000000000000000000000000000000000000000000001'
 
@@ -63,10 +77,105 @@ function classifyRawMempoolTx(rawTx: any): { txType: string; totalOut: number } 
   }
 }
 
-async function loadMempoolSnapshot(): Promise<{ payload: any; rawTxMap: Map<string, any> }> {
+async function computeMempoolAddressDeltas(
+  rawTxMap: Map<string, any>
+): Promise<Map<string, MempoolAddressDelta>> {
+  const deltas = new Map<string, MempoolAddressDelta>()
+  if (rawTxMap.size === 0) return deltas
+
+  const txSetsByAddr = new Map<string, Set<string>>()
+  const ensureEntry = (addr: string, txid: string): MempoolAddressDelta => {
+    let entry = deltas.get(addr)
+    if (!entry) {
+      entry = { receivedSats: 0, sentSats: 0, txCount: 0 }
+      deltas.set(addr, entry)
+    }
+    let txSet = txSetsByAddr.get(addr)
+    if (!txSet) {
+      txSet = new Set<string>()
+      txSetsByAddr.set(addr, txSet)
+    }
+    if (!txSet.has(txid)) {
+      txSet.add(txid)
+      entry.txCount = txSet.size
+    }
+    return entry
+  }
+
+  const neededPrevTxids = new Set<string>()
+  const pendingInputs: Array<{ txid: string; prevTxid: string; prevVout: number }> = []
+
+  for (const [txid, rawTx] of rawTxMap.entries()) {
+    if (Array.isArray(rawTx?.vout)) {
+      for (const out of rawTx.vout) {
+        const sats = toSatoshi(out?.value)
+        if (sats <= 0) continue
+        const addrs: string[] = Array.isArray(out?.scriptPubKey?.addresses)
+          ? out.scriptPubKey.addresses
+          : []
+        for (const rawAddr of addrs) {
+          const addr = normalizeTaprootAddress(rawAddr)
+          if (!addr) continue
+          const entry = ensureEntry(addr, txid)
+          entry.receivedSats += sats
+        }
+      }
+    }
+    if (Array.isArray(rawTx?.vin)) {
+      for (const inp of rawTx.vin) {
+        if (
+          pendingInputs.length < MAX_MEMPOOL_PREVOUT_LOOKUPS &&
+          inp?.txid &&
+          inp.txid !== ZERO_COIN_SENTINEL_TXID &&
+          typeof inp?.vout === 'number'
+        ) {
+          neededPrevTxids.add(inp.txid)
+          pendingInputs.push({ txid, prevTxid: inp.txid, prevVout: inp.vout })
+        }
+      }
+    }
+  }
+
+  if (pendingInputs.length > 0 && neededPrevTxids.size > 0) {
+    const prevOutMap = new Map<string, { address: string; sats: number }>()
+    const prevTxids = Array.from(neededPrevTxids)
+    for (let i = 0; i < prevTxids.length; i += 100) {
+      const chunk = prevTxids.slice(i, i + 100)
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = await dbQuery(
+        `SELECT txid, n, address, amount FROM vout WHERE txid IN (${placeholders})`,
+        chunk
+      )
+      for (const r of rows || []) {
+        if (r?.txid && typeof r?.n === 'number' && r?.address) {
+          prevOutMap.set(`${r.txid}:${r.n}`, {
+            address: normalizeTaprootAddress(r.address),
+            sats: toSatoshi(r.amount)
+          })
+        }
+      }
+    }
+
+    for (const inp of pendingInputs) {
+      const prev = prevOutMap.get(`${inp.prevTxid}:${inp.prevVout}`)
+      if (prev && prev.sats > 0) {
+        const entry = ensureEntry(prev.address, inp.txid)
+        entry.sentSats += prev.sats
+      }
+    }
+  }
+
+  return deltas
+}
+
+async function loadMempoolSnapshot(): Promise<MempoolSnapshotResult> {
   const now = Date.now()
   if (cachedMempool && now - cachedMempoolTime < MEMPOOL_CACHE_TTL_MS) {
-    return { payload: cachedMempool, rawTxMap: cachedMempoolRawTxs }
+    return {
+      payload: cachedMempool,
+      rawTxMap: cachedMempoolRawTxs,
+      addressDeltas: cachedAddressDeltas
+    }
   }
 
   if (inflightMempoolPromise) {
@@ -106,6 +215,10 @@ async function loadMempoolSnapshot(): Promise<{ payload: any; rawTxMap: Map<stri
       } catch (_) {}
     }
 
+    const addressDeltas = await computeMempoolAddressDeltas(rawTxMap).catch(
+      () => new Map<string, MempoolAddressDelta>()
+    )
+
     const nowSec = Math.floor(now / 1000)
     let totalFeesSats = 0
     for (const e of entries) {
@@ -139,8 +252,9 @@ async function loadMempoolSnapshot(): Promise<{ payload: any; rawTxMap: Map<stri
 
     cachedMempool = payload
     cachedMempoolRawTxs = rawTxMap
+    cachedAddressDeltas = addressDeltas
     cachedMempoolTime = Date.now()
-    return { payload, rawTxMap }
+    return { payload, rawTxMap, addressDeltas }
   })().finally(() => {
     inflightMempoolPromise = null
   })

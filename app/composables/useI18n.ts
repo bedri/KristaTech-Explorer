@@ -1372,10 +1372,17 @@ export function translateKey(localeCode: string, key: string): string {
   return key
 }
 
+const LOCALE_COOKIE_OPTIONS = {
+  sameSite: 'lax' as const,
+  secure: !import.meta.dev,
+  maxAge: 60 * 60 * 24 * 365,
+  path: '/'
+}
+
 export function useI18n() {
   const currentLocale = useState<string>('explorer_locale_state', () => {
     // Check cookie first
-    const localeCookie = useCookie<string>('explorer_locale')
+    const localeCookie = useCookie<string>('explorer_locale', LOCALE_COOKIE_OPTIONS)
     if (localeCookie.value && supportedLocales.includes(localeCookie.value)) {
       return localeCookie.value
     }
@@ -1394,7 +1401,7 @@ export function useI18n() {
   const setLocale = (locale: string) => {
     if (supportedLocales.includes(locale)) {
       currentLocale.value = locale
-      const localeCookie = useCookie<string>('explorer_locale')
+      const localeCookie = useCookie<string>('explorer_locale', LOCALE_COOKIE_OPTIONS)
       localeCookie.value = locale
     }
   }

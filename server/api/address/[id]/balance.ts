@@ -66,36 +66,17 @@ export default defineEventHandler(async (event) => {
 
       let unconfirmedReceivedSats = 0
       let unconfirmedSentSats = 0
-      const unconfirmedTxids = new Set<string>()
+      let unconfirmedTxCount = 0
 
       if (includeMempool) {
         try {
-          const { payload, rawTxMap } = await getCachedMempoolSummary()
-          if ((payload?.size || 0) > 0 && rawTxMap.size > 0) {
-            for (const [txid, rawTx] of rawTxMap.entries()) {
-              if (Array.isArray(rawTx?.vout)) {
-                for (const out of rawTx.vout) {
-                  const addrs = out?.scriptPubKey?.addresses || []
-                  if (addrs.some((a: string) => normalizeTaprootAddress(a) === address)) {
-                    unconfirmedReceivedSats += toSatoshi(out?.value)
-                    unconfirmedTxids.add(txid)
-                  }
-                }
-              }
-              if (Array.isArray(rawTx?.vin)) {
-                for (const inp of rawTx.vin) {
-                  if (inp?.txid && typeof inp?.vout === 'number') {
-                    const spentPrev = await dbGet(
-                      'SELECT address, amount FROM vout WHERE txid = ? AND n = ?',
-                      [inp.txid, inp.vout]
-                    )
-                    if (spentPrev && spentPrev.address === address) {
-                      unconfirmedSentSats += toSatoshi(spentPrev.amount)
-                      unconfirmedTxids.add(txid)
-                    }
-                  }
-                }
-              }
+          const { payload, addressDeltas } = await getCachedMempoolSummary()
+          if ((payload?.size || 0) > 0 && addressDeltas) {
+            const delta = addressDeltas.get(address)
+            if (delta) {
+              unconfirmedReceivedSats = delta.receivedSats
+              unconfirmedSentSats = delta.sentSats
+              unconfirmedTxCount = delta.txCount
             }
           }
         } catch (_) {}
@@ -125,7 +106,7 @@ export default defineEventHandler(async (event) => {
               received: fromSatoshi(unconfirmedReceivedSats),
               sent: fromSatoshi(unconfirmedSentSats),
               delta: fromSatoshi(unconfirmedDeltaSats),
-              txCount: unconfirmedTxids.size
+              txCount: unconfirmedTxCount
             }
           : null
       }

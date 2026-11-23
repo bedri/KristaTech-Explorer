@@ -59,6 +59,17 @@ import {
   resetSseHubForTests
 } from '../server/utils/events.ts'
 import { buildOpenApiSpec } from '../server/utils/openapi.ts'
+import {
+  CANONICAL_EXPLORER_URL,
+  EXPLORER_API_CSP,
+  EXPLORER_PAGE_CSP,
+  isApiRequestPath,
+  isContentLengthExceeded,
+  MAX_JSON_POST_BYTES,
+  normalizeRequestPath,
+  resolveClientIp,
+  resolveSafeOpenApiServerUrl
+} from '../server/utils/security.ts'
 import { explorerTranslations, translateKey } from '../app/composables/useI18n.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -646,5 +657,63 @@ describe('API v2.1 Utilities, Validation, Caching, Fees, Validator Stats, SSE & 
     assert.equal(detectSearchQueryType(blsHex), 'bls_pubkey')
     assert.equal(isValidBlsPubkey(blsHex), true)
     assert.equal(isValidBlsPubkey('b70a'), false)
+  })
+
+  it('hardens proxy IP resolution, double-slash normalization, OpenAPI host guard, CSP & payload limits', () => {
+    // 1. Path normalization prevents //api/* and /%2fapi/* middleware bypasses
+    assert.equal(normalizeRequestPath('//api/tx/broadcast?foo=1'), '/api/tx/broadcast')
+    assert.equal(normalizeRequestPath('/%2fapi/health'), '/api/health')
+    assert.equal(isApiRequestPath('//api/tx/broadcast'), true)
+    assert.equal(isApiRequestPath('/%2fapi/status?x=1'), true)
+    assert.equal(isApiRequestPath('/blocks'), false)
+
+    // 2. Reverse-proxy IP extraction prevents X-Forwarded-For loopback spoofing
+    assert.deepEqual(
+      resolveClientIp({
+        xRealIp: '203.0.113.55',
+        xForwardedFor: '127.0.0.1, 198.51.100.2',
+        remoteAddress: '127.0.0.1'
+      }),
+      { ip: '203.0.113.55', isDirectLoopback: false }
+    )
+    assert.deepEqual(
+      resolveClientIp({
+        xForwardedFor: '127.0.0.1, 198.51.100.77',
+        remoteAddress: '127.0.0.1'
+      }),
+      { ip: '198.51.100.77', isDirectLoopback: false }
+    )
+    assert.deepEqual(
+      resolveClientIp({ remoteAddress: '127.0.0.1' }),
+      { ip: '127.0.0.1', isDirectLoopback: true }
+    )
+    assert.deepEqual(
+      resolveClientIp({ xForwardedFor: '127.0.0.1', remoteAddress: '127.0.0.1' }),
+      { ip: '127.0.0.1', isDirectLoopback: false }
+    )
+
+    // 3. OpenAPI host & scheme validation prevents cache-poisoning / XSS injection
+    assert.equal(
+      resolveSafeOpenApiServerUrl('evil.attacker.tld', 'javascript'),
+      CANONICAL_EXPLORER_URL
+    )
+    assert.equal(
+      resolveSafeOpenApiServerUrl('explorer.kristalteknoloji.com', 'javascript'),
+      'https://explorer.kristalteknoloji.com'
+    )
+    assert.equal(
+      resolveSafeOpenApiServerUrl('localhost:27799', 'http'),
+      'http://localhost:27799'
+    )
+
+    // 4. Content-Length pre-check rejects oversized POST payloads before readBody()
+    assert.equal(isContentLengthExceeded(String(MAX_JSON_POST_BYTES)), false)
+    assert.equal(isContentLengthExceeded(String(MAX_JSON_POST_BYTES + 1)), true)
+    assert.equal(isContentLengthExceeded(undefined), false)
+
+    // 5. CSP invariants
+    assert.match(EXPLORER_PAGE_CSP, /frame-ancestors 'none'/)
+    assert.match(EXPLORER_PAGE_CSP, /object-src 'none'/)
+    assert.equal(EXPLORER_API_CSP, "default-src 'none'; frame-ancestors 'none'")
   })
 })

@@ -1,4 +1,11 @@
 import { API_VERSION } from '../utils/api'
+import {
+  EXPLORER_API_CSP,
+  EXPLORER_PAGE_CSP,
+  isApiRequestPath,
+  normalizeRequestPath,
+  resolveClientIp
+} from '../utils/security'
 
 interface RateLimitBucket {
   count: number
@@ -29,33 +36,27 @@ setInterval(() => {
   pruneBuckets(Date.now())
 }, 300_000).unref?.()
 
-function getClientIp(event: any): string {
-  const xff = getRequestHeader(event, 'x-forwarded-for')
-  if (xff) {
-    return xff.split(',')[0].trim()
-  }
-  const realIp = getRequestHeader(event, 'x-real-ip')
-  if (realIp) {
-    return realIp.trim()
-  }
-  return event.node?.req?.socket?.remoteAddress || '127.0.0.1'
-}
-
-function isLoopbackIp(ip: string): boolean {
-  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
-}
-
 export default defineEventHandler((event) => {
-  // 1. Set standard HTTP Security Headers
+  const url = event.path || event.node?.req?.url || ''
+  const isApi = isApiRequestPath(url)
+  const normalizedPath = normalizeRequestPath(url)
+
+  // 1. Set hardened HTTP Security Headers
   setResponseHeader(event, 'X-Content-Type-Options', 'nosniff')
   setResponseHeader(event, 'X-Frame-Options', 'DENY')
   setResponseHeader(event, 'Referrer-Policy', 'strict-origin-when-cross-origin')
   setResponseHeader(event, 'Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
-  setResponseHeader(event, 'X-XSS-Protection', '1; mode=block')
+  setResponseHeader(event, 'X-XSS-Protection', '0')
+  setResponseHeader(event, 'X-Permitted-Cross-Domain-Policies', 'none')
+  setResponseHeader(event, 'Content-Security-Policy', isApi ? EXPLORER_API_CSP : EXPLORER_PAGE_CSP)
 
-  // 2. Apply CORS, API versioning, and IP-based Rate Limiting on /api/* endpoints
-  const url = event.path || event.node?.req?.url || ''
-  if (url.startsWith('/api/')) {
+  const proto = getRequestHeader(event, 'x-forwarded-proto')
+  if (proto === 'https' || process.env.NODE_ENV === 'production') {
+    setResponseHeader(event, 'Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  }
+
+  // 2. Apply CORS, API versioning, and anti-spoofing IP-based Rate Limiting on /api/* endpoints
+  if (isApi) {
     const config = useRuntimeConfig()
     const corsOrigin = String(config?.apiCorsOrigin || '*')
 
@@ -74,14 +75,17 @@ export default defineEventHandler((event) => {
       return ''
     }
 
-    const pathname = url.split('?')[0] || url
-    const isBroadcast = pathname === '/api/tx/broadcast'
+    const isBroadcast = normalizedPath === '/api/tx/broadcast'
     const limitMax = isBroadcast ? BROADCAST_RATE_LIMIT_MAX_REQUESTS : RATE_LIMIT_MAX_REQUESTS
-    const ip = getClientIp(event)
+    const { ip, isDirectLoopback } = resolveClientIp({
+      xRealIp: getRequestHeader(event, 'x-real-ip'),
+      xForwardedFor: getRequestHeader(event, 'x-forwarded-for'),
+      remoteAddress: event.node?.req?.socket?.remoteAddress
+    })
     const now = Date.now()
 
-    // Exempt local loopback health checks from general rate limit, but still limit broadcast tests
-    if (!isLoopbackIp(ip) || isBroadcast) {
+    // Only exempt direct local loopback requests without reverse-proxy headers (and never exempt broadcast)
+    if (!isDirectLoopback || isBroadcast) {
       const bucketKey = isBroadcast ? `broadcast:${ip}` : `api:${ip}`
       if (!ipBuckets.has(bucketKey) && ipBuckets.size >= MAX_IP_BUCKETS) {
         pruneBuckets(now)

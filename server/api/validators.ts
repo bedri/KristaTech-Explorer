@@ -1,6 +1,6 @@
 import { callRpc } from '../utils/rpc'
 import { dbGet } from '../utils/db'
-import { setCacheControl } from '../utils/api'
+import { BoundedTtlCache, setCacheControl } from '../utils/api'
 import {
   ADAM_COIN_LOCK_TRACK_QUOTA,
   ADAM_COORD_WEIGHT_COIN_LOCK,
@@ -13,8 +13,7 @@ import {
 } from '../../app/utils/protocol'
 
 const VALIDATORS_CACHE_TTL_MS = 8_000
-let cachedValidatorsResponse: any = null
-let cachedValidatorsTime = 0
+const validatorsCache = new BoundedTtlCache<any>(VALIDATORS_CACHE_TTL_MS, 2)
 
 export interface ValidatorPoolSummary {
   total: number
@@ -27,10 +26,7 @@ export interface ValidatorPoolSummary {
 }
 
 export async function getValidatorPoolData() {
-  const now = Date.now()
-  if (cachedValidatorsResponse && now - cachedValidatorsTime < VALIDATORS_CACHE_TTL_MS) {
-    return cachedValidatorsResponse
-  }
+  return validatorsCache.getOrLoad('pool', async () => {
 
   let currentHeight = 0
   try {
@@ -281,7 +277,7 @@ export async function getValidatorPoolData() {
     }
   }
 
-  const payload = {
+  return {
     success: true,
     height: currentHeight,
     summary,
@@ -292,10 +288,7 @@ export async function getValidatorPoolData() {
     masternodeStats,
     masternodes
   }
-
-  cachedValidatorsResponse = payload
-  cachedValidatorsTime = now
-  return payload
+  })
 }
 
 export default defineEventHandler(async (event) => {
