@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useI18n } from '~/composables/useI18n'
-import { calculateModelDSplits, getDynamicLlmqSpec } from '~/utils/protocol'
+import { calculateModelDSplits, getAdamTrackSpec, getDynamicLlmqSpec } from '~/utils/protocol'
 import { formatBytes, formatCoins, formatHashrate, formatNumber } from '~/utils/formatters'
 
 const { locale, t } = useI18n()
@@ -18,6 +18,7 @@ watch(
   }
 )
 const simLlmqSpec = computed(() => getDynamicLlmqSpec(Math.max(0, Number(simActiveMns.value) || 0)))
+const simTrackSpec = computed(() => getAdamTrackSpec(Math.max(0, Number(simHeight.value) || 0)))
 const simSplits = computed(() =>
   calculateModelDSplits(
     Math.max(0, Number(simHeight.value) || 0),
@@ -292,7 +293,7 @@ const volumeBars = computed(() => {
           </div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.producer, 4) }}</div>
           <div v-if="simHeight >= 200" class="text-[10px] text-slate-500 mt-0.5">
-            PoS: {{ simSplits.posStaker }} + {{ simSplits.posCoordinator }}
+            PoS: {{ simHeight >= 5000 ? '22%' : '20%' }} ({{ simSplits.posStaker }}) + {{ simHeight >= 5000 ? '3%' : '5%' }} Coord ({{ simSplits.posCoordinator }})
           </div>
         </div>
         <div class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
@@ -312,6 +313,40 @@ const volumeBars = computed(() => {
           <div class="text-[10px] text-slate-500 mt-0.5">
             {{ simHeight >= 200 ? `Equal Pay: ${simSplits.committeeSeatEach} / seat (1/${simSplits.committeeSeats})` : 'Bootstrap PoW (#0–#199)' }}
           </div>
+        </div>
+      </div>
+
+      <!-- Simulated Consensus Parameters Strip -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] pt-1">
+        <div class="px-3.5 py-2.5 rounded-xl bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+          <span class="font-bold text-slate-700 dark:text-slate-200">Track Quotas:</span>
+          <span class="ml-1.5 text-slate-600 dark:text-slate-300 font-mono">
+            {{
+              simHeight >= 5000
+                ? `${simTrackSpec.masternodeQuota} MN + ${simTrackSpec.coinLockQuota} CL + ${simTrackSpec.openPowQuota} Open PoW (3 Funded + 2 Zero-Coin) • thr ${simTrackSpec.threshold}`
+                : simHeight >= 200
+                  ? `${simTrackSpec.masternodeQuota} MN + ${simTrackSpec.coinLockQuota} CL + ${simTrackSpec.openPowQuota} Open PoW (${simHeight >= 2500 ? '2 Funded + 1 Open' : '2 Funded + 1 Open @ #2,500'}) • thr ${simTrackSpec.threshold}`
+                  : 'Bootstrap X11KVS PoW (#0–#199)'
+            }}
+          </span>
+        </div>
+        <div class="px-3.5 py-2.5 rounded-xl bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+          <span class="font-bold text-slate-700 dark:text-slate-200">Coordinator VRF:</span>
+          <span class="ml-1.5 text-slate-600 dark:text-slate-300 font-mono">
+            {{
+              simHeight >= 5000
+                ? '4,200:250:10 • ≥55% MN Floor (11×Non-MN > 9×MN, V5) • 100-blk maturity'
+                : simHeight >= 200
+                  ? '4,200:250:10 • ≥75% MN Floor (3×Non-MN > MN, V4) • 100-blk maturity'
+                  : 'Activates @ #200 (V4 ≥75%) → #5,000 (V5 ≥55%)'
+            }}
+          </span>
+        </div>
+        <div class="px-3.5 py-2.5 rounded-xl bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+          <span class="font-bold text-slate-700 dark:text-slate-200">Stake Min Depth:</span>
+          <span class="ml-1.5 text-slate-600 dark:text-slate-300 font-mono">
+            {{ simHeight >= 5001 ? '600 blocks (V2 @ #5,001+)' : simHeight >= 200 ? '100 blocks (#200–#5,000)' : 'Inactive (< #200)' }}
+          </span>
         </div>
       </div>
     </div>

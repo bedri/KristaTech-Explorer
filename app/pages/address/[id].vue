@@ -507,7 +507,7 @@ function exportTransactionsCsv() {
                       </span>
                     </td>
                     <td class="p-3.5 font-semibold">{{ formatCoins(b.reward, 2) }}</td>
-                    <td class="p-3.5 font-mono text-xs">{{ b.solvedSeats }}/11</td>
+                    <td class="p-3.5 font-mono text-xs">{{ b.height >= 200 ? `${b.solvedSeats}/${b.height >= 5000 ? 15 : 11}` : '—' }}</td>
                     <td class="p-3.5 text-right text-xs text-slate-500">{{ formatDate(b.time) }}</td>
                   </tr>
                 </tbody>

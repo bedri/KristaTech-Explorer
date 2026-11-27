@@ -38,6 +38,8 @@ export interface CoordinatorWeightSummary {
 
 export interface AdamTrackSpec {
   isModelD: boolean
+  isBootstrapPow: boolean
+  committeeActive: boolean
   committeeSize: number
   masternodeQuota: number
   coinLockQuota: number
@@ -75,6 +77,8 @@ export function getAdamTrackSpec(height: number): AdamTrackSpec {
   if (h >= MODEL_D_ACTIVATION_HEIGHT) {
     return {
       isModelD: true,
+      isBootstrapPow: false,
+      committeeActive: true,
       committeeSize: ADAM_MODELD_COMMITTEE_SIZE,
       masternodeQuota: ADAM_MODELD_MASTERNODE_TRACK_QUOTA,
       coinLockQuota: ADAM_MODELD_COIN_LOCK_TRACK_QUOTA,
@@ -87,14 +91,16 @@ export function getAdamTrackSpec(height: number): AdamTrackSpec {
   }
   return {
     isModelD: false,
+    isBootstrapPow: h < 200,
+    committeeActive: h >= 200,
     committeeSize: ADAM_COMMITTEE_SIZE,
     masternodeQuota: ADAM_MASTERNODE_TRACK_QUOTA,
     coinLockQuota: ADAM_COIN_LOCK_TRACK_QUOTA,
     openPowQuota: ADAM_OPEN_POW_TRACK_QUOTA,
     zeroCoinMaxSeats: 1,
     threshold: 7,
-    committeePoolPct: h >= 200 ? 75 : 0,
-    perSeatNetPct: h >= 200 ? 6.82 : 0
+    committeePoolPct: 75,
+    perSeatNetPct: 6.82
   }
 }
 

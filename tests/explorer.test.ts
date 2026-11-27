@@ -145,9 +145,24 @@ describe('KristaTech Protocol & Tokenomics Math (v1.5.9.0 / 70983)', () => {
     assert.deepEqual(getDynamicLlmqSpec(100, false), { size: 15, threshold: 8 })
     assert.equal(calculateModelDSplits(5000, 17, 100).llmqPerSigner, 0.1054)
 
-    // Dual-Track quotas: Pre-Model D (7+1+3) vs Balanced Model D (8+2+5)
+    // Dual-Track quotas: Bootstrap (< 200), Pre-Model D (7+1+3) vs Balanced Model D (8+2+5)
+    assert.deepEqual(getAdamTrackSpec(145), {
+      isModelD: false,
+      isBootstrapPow: true,
+      committeeActive: false,
+      committeeSize: 11,
+      masternodeQuota: 7,
+      coinLockQuota: 1,
+      openPowQuota: 3,
+      zeroCoinMaxSeats: 1,
+      threshold: 7,
+      committeePoolPct: 75,
+      perSeatNetPct: 6.82
+    })
     assert.deepEqual(getAdamTrackSpec(1000), {
       isModelD: false,
+      isBootstrapPow: false,
+      committeeActive: true,
       committeeSize: 11,
       masternodeQuota: 7,
       coinLockQuota: 1,
@@ -159,6 +174,8 @@ describe('KristaTech Protocol & Tokenomics Math (v1.5.9.0 / 70983)', () => {
     })
     assert.deepEqual(getAdamTrackSpec(5000), {
       isModelD: true,
+      isBootstrapPow: false,
+      committeeActive: true,
       committeeSize: 15,
       masternodeQuota: 8,
       coinLockQuota: 2,

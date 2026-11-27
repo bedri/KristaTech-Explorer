@@ -77,6 +77,7 @@ export async function getValidatorPoolData() {
   }
 
   const coordinatorVrf = calculateCoordinatorWeights(summary, currentHeight)
+  const modelDCoordinatorVrf = calculateCoordinatorWeights(summary, MODEL_D_ACTIVATION_HEIGHT)
 
   const validators = rawList.map((entry: any, idx: number) => {
     const track = String(entry?.track || 'bootstrap')
@@ -259,6 +260,8 @@ export async function getValidatorPoolData() {
         : 0
     return {
       isModelD: spec.isModelD,
+      isBootstrapPow: spec.isBootstrapPow,
+      committeeActive: spec.committeeActive,
       committeeSize: spec.committeeSize,
       threshold: spec.threshold,
       committeePoolPct: spec.committeePoolPct,
@@ -297,6 +300,7 @@ export async function getValidatorPoolData() {
     quotas,
     modelDQuotas,
     coordinatorVrf,
+    modelDCoordinatorVrf,
     validators,
     quorum,
     masternodeStats,

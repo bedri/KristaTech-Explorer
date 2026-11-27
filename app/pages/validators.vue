@@ -111,15 +111,29 @@ function trackLabel(track) {
       </button>
     </div>
 
-    <!-- Dual-Track Committee Quota Cards (7/1/3 Pre-Model D -> 8/2/5 Balanced Model D) -->
+    <!-- Active Consensus Phase Notice (Bootstrap / Pre-Model D transition) -->
+    <div
+      v-if="valData?.quotas && !valData.quotas.isModelD"
+      class="glass-card rounded-xl px-4 py-3 border-l-4 border-l-brand-blue flex items-start gap-3 text-xs sm:text-sm text-slate-700 dark:text-slate-200"
+    >
+      <UIcon name="i-heroicons-information-circle" class="w-5 h-5 text-brand-blue shrink-0 mt-0.5" aria-hidden="true" />
+      <span>
+        {{ valData.quotas.isBootstrapPow ? t('validatorsPhaseBootstrap') : t('validatorsPhasePreModelD') }}
+      </span>
+    </div>
+
+    <!-- Dual-Track Committee Quota Cards (8/2/5 Balanced Model D; 7/1/3 Pre-Model D #200-#4,999) -->
     <div v-if="valData?.quotas" class="grid grid-cols-1 md:grid-cols-3 gap-5">
       <div class="glass-card rounded-xl p-5 space-y-3 border-t-4 border-t-purple-500">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-2">
           <span class="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-300">
             Sub-Track 1A • Masternode
           </span>
-          <span class="text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
+          <span v-if="valData.quotas.isModelD" class="text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
             {{ valData.quotas.masternode.used }} / {{ valData.quotas.masternode.max }} seats
+          </span>
+          <span v-else class="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200">
+            {{ valData.quotas.masternode.used }} / {{ valData.quotas.masternode.max }} (#200) → {{ valData.modelDQuotas?.masternode?.max || 8 }} (#5k)
           </span>
         </div>
         <div class="text-2xl font-extrabold text-slate-800 dark:text-white">
@@ -135,17 +149,20 @@ function trackLabel(track) {
           Model D Net Pool: <strong>{{ valData.quotas.masternode.rewardShareNetPct }}%</strong> (Equal {{ valData.quotas.masternode.perSeatNetPct }}% / seat) • <strong>4,200</strong> VRF weight (KTDIP3)
         </p>
         <p v-else class="text-xs text-slate-500 dark:text-slate-400">
-          Active (#200+): <strong>{{ valData.quotas.masternode.rewardShareNetPct }}%</strong> ({{ valData.quotas.masternode.perSeatNetPct }}% / seat) • Model D #5,000: <strong>{{ valData.modelDQuotas?.masternode?.max || 8 }} seats ({{ valData.modelDQuotas?.masternode?.rewardShareNetPct || 32 }}%)</strong> • <strong>4,200</strong> VRF
+          Model D #5,000+: <strong>{{ valData.modelDQuotas?.masternode?.max || 8 }} seats • {{ valData.modelDQuotas?.masternode?.rewardShareNetPct || 32 }}% ({{ valData.modelDQuotas?.masternode?.perSeatNetPct || 4 }}%/seat)</strong> • Pre-Model D (#200–#4,999): <strong>{{ valData.quotas.masternode.rewardShareNetPct }}%</strong> ({{ valData.quotas.masternode.perSeatNetPct }}%/seat) • <strong>4,200</strong> VRF
         </p>
       </div>
 
       <div class="glass-card rounded-xl p-5 space-y-3 border-t-4 border-t-amber-500">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-2">
           <span class="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-300">
             Sub-Track 1B • Coin-Lock
           </span>
-          <span class="text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
+          <span v-if="valData.quotas.isModelD" class="text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
             {{ valData.quotas.coinLock.used }} / {{ valData.quotas.coinLock.max }} {{ valData.quotas.coinLock.max === 1 ? 'seat' : 'seats' }}
+          </span>
+          <span v-else class="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200">
+            {{ valData.quotas.coinLock.used }} / {{ valData.quotas.coinLock.max }} (#200) → {{ valData.modelDQuotas?.coinLock?.max || 2 }} (#5k)
           </span>
         </div>
         <div class="text-2xl font-extrabold text-slate-800 dark:text-white">
@@ -161,17 +178,20 @@ function trackLabel(track) {
           Model D Net Pool: <strong>{{ valData.quotas.coinLock.rewardShareNetPct }}%</strong> (Equal {{ valData.quotas.coinLock.perSeatNetPct }}% / seat; 60%/15) • <strong>250</strong> VRF weight (uncapped)
         </p>
         <p v-else class="text-xs text-slate-500 dark:text-slate-400">
-          Active (#200+): <strong>{{ valData.quotas.coinLock.rewardShareNetPct }}%</strong> ({{ valData.quotas.coinLock.perSeatNetPct }}% / seat) • Model D #5,000: <strong>{{ valData.modelDQuotas?.coinLock?.max || 2 }} seats ({{ valData.modelDQuotas?.coinLock?.rewardShareNetPct || 8 }}%)</strong> • <strong>250</strong> VRF
+          Model D #5,000+: <strong>{{ valData.modelDQuotas?.coinLock?.max || 2 }} seats • {{ valData.modelDQuotas?.coinLock?.rewardShareNetPct || 8 }}% ({{ valData.modelDQuotas?.coinLock?.perSeatNetPct || 4 }}%/seat)</strong> • Pre-Model D (#200–#4,999): <strong>{{ valData.quotas.coinLock.rewardShareNetPct }}%</strong> ({{ valData.quotas.coinLock.perSeatNetPct }}%/seat) • <strong>250</strong> VRF
         </p>
       </div>
 
       <div class="glass-card rounded-xl p-5 space-y-3 border-t-4 border-t-sky-500">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-2">
           <span class="text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-300">
             Track 2 • Open PoW
           </span>
-          <span class="text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
+          <span v-if="valData.quotas.isModelD" class="text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
             {{ valData.quotas.openPow.used }} / {{ valData.quotas.openPow.max }} seats
+          </span>
+          <span v-else class="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200">
+            {{ valData.quotas.openPow.used }} / {{ valData.quotas.openPow.max }} (#200) → {{ valData.modelDQuotas?.openPow?.max || 5 }} (#5k)
           </span>
         </div>
         <div class="text-2xl font-extrabold text-slate-800 dark:text-white">
@@ -184,10 +204,10 @@ function trackLabel(track) {
           ></div>
         </div>
         <p v-if="valData.quotas.isModelD" class="text-xs text-slate-500 dark:text-slate-400">
-          Model D Net Pool: <strong>{{ valData.quotas.openPow.rewardShareNetPct }}%</strong> (3 Funded + {{ valData.quotas.openPow.zeroCoinMaxSeats ?? 2 }} Zero-Coin • {{ valData.quotas.openPow.perSeatNetPct }}% / seat) • <strong>10</strong> VRF
+          Model D Net Pool: <strong>{{ valData.quotas.openPow.rewardShareNetPct }}%</strong> (3 Funded [10 VRF] + {{ valData.quotas.openPow.zeroCoinMaxSeats ?? 2 }} Zero-Coin [0 VRF] • {{ valData.quotas.openPow.perSeatNetPct }}% / seat)
         </p>
         <p v-else class="text-xs text-slate-500 dark:text-slate-400">
-          Active (#200+): <strong>{{ valData.quotas.openPow.rewardShareNetPct }}%</strong> (2 Funded + 1 Open @ #2,500) • Model D #5,000: <strong>{{ valData.modelDQuotas?.openPow?.max || 5 }} seats (3 Funded + 2 Zero-Coin, {{ valData.modelDQuotas?.openPow?.rewardShareNetPct || 20 }}%)</strong> • <strong>10</strong> VRF
+          Model D #5,000+: <strong>{{ valData.modelDQuotas?.openPow?.max || 5 }} seats (3 Funded + 2 Zero-Coin • {{ valData.modelDQuotas?.openPow?.rewardShareNetPct || 20 }}%, {{ valData.modelDQuotas?.openPow?.perSeatNetPct || 4 }}%/seat)</strong> • Pre-Model D (#200–#4,999): <strong>{{ valData.quotas.openPow.rewardShareNetPct }}%</strong> (2 Funded + 1 Open @ #2,500) • <strong>10</strong> VRF (Funded)
         </p>
       </div>
     </div>
@@ -199,10 +219,16 @@ function trackLabel(track) {
           <h2 class="text-lg font-bold text-slate-800 dark:text-white flex flex-wrap items-center gap-2">
             <span>{{ t('coordVrfTitle') }}</span>
             <span class="px-2 py-0.5 rounded bg-brand-blue/15 text-brand-blue text-[11px] font-bold">
-              {{ valData.coordinatorVrf.isModelD ? '≥55% MN Floor (Model D V5)' : '≥75% Pre-Model D (V4) → ≥55% @ #5,000 (V5)' }}
+              {{ valData.coordinatorVrf.isModelD ? '≥55% MN Floor (Balanced Model D • V5)' : '≥55% MN Floor @ #5,000 (Model D • V5)' }}
             </span>
             <span
-              v-if="valData.coordinatorVrf.mnFloorApplied"
+              v-if="!valData.coordinatorVrf.isModelD"
+              class="px-2 py-0.5 rounded bg-slate-200/80 dark:bg-white/10 text-slate-600 dark:text-slate-300 text-[11px] font-semibold"
+            >
+              {{ valData.quotas?.isBootstrapPow ? 'Pre-Model D (#200–#4,999): ≥75% (V4)' : 'Active (#200–#4,999): ≥75% (V4)' }}
+            </span>
+            <span
+              v-if="valData.coordinatorVrf.mnFloorApplied && valData.quotas?.committeeActive"
               class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold"
             >
               ≥{{ valData.coordinatorVrf.mnFloorPct }}% {{ t('mnFloorBadge') }}
