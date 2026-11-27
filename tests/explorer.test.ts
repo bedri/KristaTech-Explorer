@@ -11,6 +11,8 @@ import {
   calculateModelDSplits,
   calculateCoordinatorWeights,
   getDynamicLlmqSpec,
+  getAdamTrackSpec,
+  getSafeHashrateLookupWindow,
   classifyBlockRewardOutputs,
   detectSearchQueryType,
   hasBip324ServiceFlag,
@@ -114,31 +116,58 @@ describe('KristaTech Protocol & Tokenomics Math (v1.5.9.0 / 70983)', () => {
     assert.equal(calculateTotalSupply(259202), 4406416.6345)
   })
 
-  it('computes exact UPGRADE_FAIRNESS Model D & Pre-Model D splits (Equal-Pay & Dynamic LLMQ)', () => {
+  it('computes exact UPGRADE_FAIRNESS Balanced Model D & Pre-Model D splits (Equal-Pay & 2/3 BFT LLMQ)', () => {
     // At Block 5000, gross subsidy is 17 KRISTA, 7% treasury = 1.19, 93% net = 15.81
+    // Balanced Model D: 5% Passive MN, 10% LLMQ, 60% Committee (15 seats = 4.00%/seat), 25% Producer (PoS 22%+3%)
     const split5000 = calculateModelDSplits(5000)
     assert.equal(split5000.subsidy, 17)
     assert.equal(split5000.treasury, 1.19)
     assert.equal(split5000.netPool, 15.81)
-    assert.equal(split5000.passiveMn, 5.5335) // 35% of 15.81
-    assert.equal(split5000.committeeTotal, 6.324) // 40% of 15.81
-    assert.equal(split5000.producer, 2.3715) // 15% of 15.81 (PoW)
-    assert.equal(split5000.posStaker, 1.8972) // 12% of 15.81 (PoS Staker)
+    assert.equal(split5000.passiveMn, 0.7905) // 5% of 15.81
+    assert.equal(split5000.committeeSeats, 15)
+    assert.equal(split5000.committeeTotal, 9.486) // 60% of 15.81
+    assert.equal(split5000.producer, 3.9525) // 25% of 15.81 (PoW)
+    assert.equal(split5000.posStaker, 3.4782) // 22% of 15.81 (PoS Staker)
     assert.equal(split5000.posCoordinator, 0.4743) // 3% of 15.81 (PoS Signing Coordinator)
     assert.equal(split5000.llmqTotal, 1.581) // 10% of 15.81
     assert.equal(split5000.llmqQuorumSize, 5)
     assert.equal(split5000.llmqPerSigner, 0.3162) // 15.81 * 10% / 5 signers
-    assert.equal(split5000.committeeSeatEach, 0.57490909) // Equal Work -> Equal Pay (40% / 11)
-    assert.equal(split5000.mnSeatEach, 0.57490909)
-    assert.equal(split5000.coinLockSeat, 0.57490909)
-    assert.equal(split5000.openPowSeatEach, 0.57490909)
+    assert.equal(split5000.committeeSeatEach, 0.6324) // Equal Work -> Equal Pay (60% / 15 = 4.00%)
+    assert.equal(split5000.mnSeatEach, 0.6324)
+    assert.equal(split5000.coinLockSeat, 0.6324)
+    assert.equal(split5000.openPowSeatEach, 0.6324)
 
-    // Dynamic LLMQ scaling across MN counts
-    assert.deepEqual(getDynamicLlmqSpec(4), { size: 5, threshold: 3 })
-    assert.deepEqual(getDynamicLlmqSpec(25), { size: 9, threshold: 5 })
-    assert.deepEqual(getDynamicLlmqSpec(50), { size: 11, threshold: 6 })
-    assert.deepEqual(getDynamicLlmqSpec(100), { size: 15, threshold: 8 })
+    // Dynamic LLMQ scaling across MN counts (Hardening v4 2/3 BFT supermajority vs pre-V4 majority)
+    assert.deepEqual(getDynamicLlmqSpec(4), { size: 5, threshold: 4 })
+    assert.deepEqual(getDynamicLlmqSpec(25), { size: 9, threshold: 7 })
+    assert.deepEqual(getDynamicLlmqSpec(50), { size: 11, threshold: 8 })
+    assert.deepEqual(getDynamicLlmqSpec(100), { size: 15, threshold: 11 })
+    assert.deepEqual(getDynamicLlmqSpec(100, false), { size: 15, threshold: 8 })
     assert.equal(calculateModelDSplits(5000, 17, 100).llmqPerSigner, 0.1054)
+
+    // Dual-Track quotas: Pre-Model D (7+1+3) vs Balanced Model D (8+2+5)
+    assert.deepEqual(getAdamTrackSpec(1000), {
+      isModelD: false,
+      committeeSize: 11,
+      masternodeQuota: 7,
+      coinLockQuota: 1,
+      openPowQuota: 3,
+      zeroCoinMaxSeats: 1,
+      threshold: 7,
+      committeePoolPct: 75,
+      perSeatNetPct: 6.82
+    })
+    assert.deepEqual(getAdamTrackSpec(5000), {
+      isModelD: true,
+      committeeSize: 15,
+      masternodeQuota: 8,
+      coinLockQuota: 2,
+      openPowQuota: 5,
+      zeroCoinMaxSeats: 2,
+      threshold: 8,
+      committeePoolPct: 60,
+      perSeatNetPct: 4
+    })
 
     // Pre-Model D UPGRADE_FAIRNESS split (Block 1000: 25% producer [20%+5% PoS] / 75% equal-pay committee)
     const split1000 = calculateModelDSplits(1000)
@@ -147,17 +176,20 @@ describe('KristaTech Protocol & Tokenomics Math (v1.5.9.0 / 70983)', () => {
     assert.equal(split1000.producer, 3.9525)
     assert.equal(split1000.posStaker, 3.162)
     assert.equal(split1000.posCoordinator, 0.7905)
+    assert.equal(split1000.committeeSeats, 11)
     assert.equal(split1000.committeeTotal, 11.8575)
     assert.equal(split1000.committeeSeatEach, 1.07795454)
   })
 
-  it('computes ADAM_FAIR_COORD_V4 proportional capital Coordinator VRF (4,200 : 250 : 10) with >=75% MN floor', () => {
-    // Unfloored case: 5 MNs = 21,000 vs 4 CL + 6 PL = 1,060 -> 3 * 1,060 = 3,180 <= 21,000
-    const unfloored = calculateCoordinatorWeights({
-      masternode: 5,
-      coin_lock: 4,
-      pow_lock: 6
-    })
+  it('computes ADAM_FAIR_COORD_V5 (Model D >=55%) and V4 (Pre-Model D >=75%) Coordinator VRF weights', () => {
+    // Unfloored V5 case: 5 MNs = 21,000 vs 4 CL + 6 PL = 1,060
+    const unfloored = calculateCoordinatorWeights(
+      { masternode: 5, coin_lock: 4, pow_lock: 6 },
+      5000
+    )
+    assert.equal(unfloored.isModelD, true)
+    assert.equal(unfloored.vrfVersion, 'ADAM_FAIR_COORD_V5')
+    assert.equal(unfloored.mnFloorPct, 55)
     assert.equal(unfloored.mnFloorApplied, false)
     assert.equal(unfloored.activeMnCount, 5)
     assert.equal(unfloored.eligibleCoinLockSeats, 4)
@@ -168,16 +200,40 @@ describe('KristaTech Protocol & Tokenomics Math (v1.5.9.0 / 70983)', () => {
     assert.equal(unfloored.totalPoolWeight, 22060)
     assert.equal(unfloored.mnSharePct, 95.19)
 
-    // Floored case: 1 MN = 4,200 vs 20 CL (5,000) + 100 PL (1,000) = 6,000 non-MN -> 3 * 6,000 > 4,200 -> 75% floor
-    const floored = calculateCoordinatorWeights({
-      masternode: 1,
-      coin_lock: 20,
-      pow_lock: 100
-    })
-    assert.equal(floored.mnFloorApplied, true)
-    assert.equal(floored.mnSharePct, 75)
-    assert.equal(floored.coinLockSharePct, 20.83)
-    assert.equal(floored.powLockSharePct, 4.17)
+    // Borderline: 1 MN (4,200) vs 10 CL (2,500) -> V5 (>=55%) stays unfloored (62.69%), V4 (>=75%) floors to 75%
+    const borderlineV5 = calculateCoordinatorWeights({ masternode: 1, coin_lock: 10, pow_lock: 0 }, 5000)
+    assert.equal(borderlineV5.mnFloorApplied, false)
+    assert.equal(borderlineV5.mnSharePct, 62.69)
+
+    const borderlineV4 = calculateCoordinatorWeights({ masternode: 1, coin_lock: 10, pow_lock: 0 }, 1000)
+    assert.equal(borderlineV4.isModelD, false)
+    assert.equal(borderlineV4.vrfVersion, 'ADAM_FAIR_COORD_V4')
+    assert.equal(borderlineV4.mnFloorApplied, true)
+    assert.equal(borderlineV4.mnFloorPct, 75)
+    assert.equal(borderlineV4.mnSharePct, 75)
+    assert.equal(borderlineV4.coinLockSharePct, 25)
+
+    // Floored V5 vs V4: 1 MN = 4,200 vs 20 CL (5,000) + 100 PL (1,000) = 6,000 non-MN
+    const flooredV5 = calculateCoordinatorWeights({ masternode: 1, coin_lock: 20, pow_lock: 100 }, 5000)
+    assert.equal(flooredV5.mnFloorApplied, true)
+    assert.equal(flooredV5.mnSharePct, 55)
+    assert.equal(flooredV5.coinLockSharePct, 37.5)
+    assert.equal(flooredV5.powLockSharePct, 7.5)
+
+    const flooredV4 = calculateCoordinatorWeights({ masternode: 1, coin_lock: 20, pow_lock: 100 }, 1000)
+    assert.equal(flooredV4.mnFloorApplied, true)
+    assert.equal(flooredV4.mnSharePct, 75)
+    assert.equal(flooredV4.coinLockSharePct, 20.83)
+    assert.equal(flooredV4.powLockSharePct, 4.17)
+  })
+
+  it('guards early-chain getnetworkhashps window against Genesis timestamp distortion', () => {
+    assert.equal(getSafeHashrateLookupWindow(0), 120)
+    assert.equal(getSafeHashrateLookupWindow(1), 120)
+    assert.equal(getSafeHashrateLookupWindow(2), 1)
+    assert.equal(getSafeHashrateLookupWindow(120), 119)
+    assert.equal(getSafeHashrateLookupWindow(121), 120)
+    assert.equal(getSafeHashrateLookupWindow(5000), 120)
   })
 
   it('maps consensus eras and milestones accurately across height transitions', () => {
@@ -187,17 +243,17 @@ describe('KristaTech Protocol & Tokenomics Math (v1.5.9.0 / 70983)', () => {
     assert.equal(buildConsensusInfo(3000).currentEra, 'ADAM Dual-Track • Open-Entry Active')
     assert.equal(buildConsensusInfo(3000).nextHeight, 4800)
     assert.equal(buildConsensusInfo(4900).currentEra, 'PoMBL (Block v12)')
-    assert.equal(buildConsensusInfo(5000).currentEra, 'Model D (PoBLS + Dynamic LLMQ)')
-    assert.equal(buildConsensusInfo(260000).currentEra, 'Model D • Epoch #2')
+    assert.equal(buildConsensusInfo(5000).currentEra, 'Balanced Model D (PoBLS + 2/3 BFT LLMQ)')
+    assert.equal(buildConsensusInfo(260000).currentEra, 'Balanced Model D • Epoch #2')
   })
 
-  it('classifies PoS/PoW Model D & Pre-Model D block reward outputs including 1-block lag LLMQ and PoS Coordinator', () => {
+  it('classifies PoS/PoW Balanced Model D & Pre-Model D block reward outputs including 1-block lag LLMQ and PoS Coordinator', () => {
     const classifiedModelD = classifyBlockRewardOutputs(
       [
-        { n: 1, address: 'KTStakerAddr', amount: 1.8972 },
-        { n: 2, address: 'KTPassiveMnAddr', amount: 5.5335 },
+        { n: 1, address: 'KTStakerAddr', amount: 3.4782 },
+        { n: 2, address: 'KTPassiveMnAddr', amount: 0.7905 },
         { n: 3, address: 'KTPrevLlmqSigner1', amount: 0.3162 },
-        { n: 4, address: 'KTSeat1Addr', amount: 0.57490909 },
+        { n: 4, address: 'KTSeat1Addr', amount: 0.6324 },
         { n: 5, address: 'KTCoordAddr', amount: 0.4743 },
         { n: 6, address: TREASURY_ADDRESS, amount: 1.19 },
         { n: 7, address: BURN_ADDRESSES[0]!, amount: 3.5 }
@@ -526,9 +582,14 @@ describe('API v2.1 Utilities, Validation, Caching, Fees, Validator Stats, SSE & 
     assert.equal(smart.tiers.economy.satPerByte, 12)
   })
 
-  it('computes validator window statistics with 11+1 vAdamMiners alignment', () => {
+  it('computes validator window statistics with 11+1 / 15+1 vAdamMiners alignment', () => {
     const target = 'KValAddr1'
-    const miners12 = [target, 'KOther1', 'KOther2', 'KOther3', 'KOther4', 'KOther5', 'KOther6', 'KOther7', 'KOther8', 'KOther9', 'KOther10', 'KCoordSlot']
+    const miners16 = [
+      target, 'KOther1', 'KOther2', 'KOther3', 'KOther4',
+      'KOther5', 'KOther6', 'KOther7', 'KOther8', 'KOther9',
+      'KOther10', 'KOther11', 'KOther12', 'KOther13', 'KOther14',
+      'KCoordSlot'
+    ]
     const stats = computeValidatorWindowStats(target, [
       {
         height: 5002,
@@ -537,8 +598,8 @@ describe('API v2.1 Utilities, Validation, Caching, Fees, Validator Stats, SSE & 
         is_pos: 1,
         adam_coordinator: target,
         producer_address: target,
-        adam_miners: JSON.stringify(miners12),
-        adam_solutions: JSON.stringify(['sol0', '', '', '', '', '', '', '', '', '', '']),
+        adam_miners: JSON.stringify(miners16),
+        adam_solutions: JSON.stringify(['sol0', '', '', '', '', '', '', '', '', '', '', '', '', '', '']),
         adam_quorum_signers: JSON.stringify({ signers: [target, 'KOther1'] })
       },
       {

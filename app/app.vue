@@ -446,7 +446,7 @@ onUnmounted(() => {
               </span>
             </div>
             <p class="text-xs text-slate-500 dark:text-slate-400">
-              Fair Launch • Zero Premine • ADAM 7+1+3 • 4,200:250:10 Proportional VRF (≥75% MN Floor) • KTDIP3 (wallet.dat) • MESCAL v2 • BIP324
+              Fair Launch • Zero Premine • Balanced Model D (8+2+5 • 5/10/60/25) • 4,200:250:10 VRF (≥55% MN Floor) • KTDIP3 • Hardening v4 • MESCAL v2 • BIP324
             </p>
           </div>
 

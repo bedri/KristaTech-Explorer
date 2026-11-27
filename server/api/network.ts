@@ -116,18 +116,18 @@ export default defineEventHandler(async (event) => {
       {
         id: 'bootstrap',
         height: 1,
-        title: 'Fair Launch, KTDIP3 (wallet.dat), BIP324 & UPGRADE_FAIRNESS',
-        titleTr: 'Adil Başlangıç, KTDIP3 (wallet.dat), BIP324 ve UPGRADE_FAIRNESS',
-        desc: '0 premine, deterministic KTDIP3 Masternodes (mnmeta, masternode.conf retired), BIP324 P2P v2, PoM 1.25x / PoL 3x / PoB 6x & 4,200:250:10 Proportional VRF.',
-        descTr: '0 ön madencilik, deterministik KTDIP3 Masternode (mnmeta, masternode.conf emekli), BIP324 P2P v2, PoM 1.25x / PoL 3x / PoB 6x ve 4.200:250:10 Orantılı VRF.'
+        title: 'Fair Launch, KTDIP3, BIP324 & Hardening v3/v4',
+        titleTr: 'Adil Başlangıç, KTDIP3, BIP324 ve Hardening v3/v4',
+        desc: '0 premine, deterministic KTDIP3 v2 BLS PoP (mnmeta), BIP324 P2P v2, PoM/PoL/PoB, 4,200:250:10 VRF (100-blk key maturity), ProUpReg cooldown, and 2/3 BFT LLMQ.',
+        descTr: '0 ön madencilik, deterministik KTDIP3 v2 BLS PoP (mnmeta), BIP324 P2P v2, PoM/PoL/PoB, 4.200:250:10 VRF (100-blok olgunluk), ProUpReg bekleme ve 2/3 BFT LLMQ.'
       },
       {
         id: 'adam_v1',
         height: 200,
         title: 'UPGRADE_ADAM & Dual-Track (25% / 75%)',
         titleTr: 'UPGRADE_ADAM & Çift Kulvar (%25 / %75)',
-        desc: '11+1 committee (7 MN / 1 CL / 3 Open PoW), 17 uniform algos, 25% Producer (20%/5% PoS) / 75% Equal-Pay Validators.',
-        descTr: '11+1 komite (7 MN / 1 CL / 3 Açık PoW), 17 tek-geçişli algo, %25 Üretici (PoS %20/%5) / %75 Eşit Ücretli Doğrulayıcı.'
+        desc: '11+1 Pre-Model D committee (7 MN / 1 CL / 3 Open PoW, threshold 7), 17 uniform algos, 25% Producer (20%/5% PoS) / 75% Equal-Pay Validators & ≥75% MN VRF floor (V4).',
+        descTr: '11+1 Model D öncesi komite (7 MN / 1 CL / 3 Açık PoW, eşik 7), 17 tek-geçişli algo, %25 Üretici (PoS %20/%5) / %75 Eşit Ücret ve ≥%75 MN VRF tabanı (V4).'
       },
       {
         id: 'open_entry',
@@ -148,10 +148,10 @@ export default defineEventHandler(async (event) => {
       {
         id: 'model_d',
         height: 5000,
-        title: 'UPGRADE_MODELD / ADAM v2 & Dynamic LLMQ',
-        titleTr: 'UPGRADE_MODELD / ADAM v2 & Dinamik LLMQ',
-        desc: 'Dynamic BFT LLMQ (3/5–8/15, 1-block lag signer-only + -5/+5 PoSe), Equal-Pay 40%/11, PoS 12%/3%, MESCAL v2 Taproot/PSBT & Stake Min Depth V2 (600 blks @ #5,001).',
-        descTr: 'Dinamik BFT LLMQ (3/5–8/15, 1-blok gecikmeli + -5/+5 PoSe), Eşit Ücret %40/11, PoS %12/%3, MESCAL v2 Taproot/PSBT ve Stake Min Derinlik V2 (600 blok @ #5.001).'
+        title: 'Balanced Model D (5/10/60/25 • 15+1 • ≥55% VRF)',
+        titleTr: 'Dengeli Model D (5/10/60/25 • 15+1 • ≥%55 VRF)',
+        desc: '15+1 committee (8 MN / 2 CL / 5 Open PoW; thr 8), Equal-Pay 60%/15 (4.00%), 5% MN, PoS 22%/3%, ≥55% MN VRF floor (V5), Dynamic 2/3 BFT LLMQ (4/5–11/15), MESCAL v2 & Stake Min Depth V2 (#5,001).',
+        descTr: '15+1 komite (8 MN / 2 CL / 5 Açık PoW; eşik 8), Eşit Ücret %60/15 (%4,00), %5 MN, PoS %22/%3, ≥%55 MN VRF tabanı (V5), Dinamik 2/3 BFT LLMQ (4/5–11/15), MESCAL v2 ve Stake Min Derinlik V2 (#5.001).'
       },
       {
         id: 'phase_d',

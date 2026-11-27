@@ -89,7 +89,7 @@ export function computeValidatorWindowStats(
 
     const miners = parseJsonArray(row.adam_miners)
     const solutions = parseJsonArray(row.adam_solutions)
-    // KristaTech 11+1 layout: vAdamMiners may carry 12 entries (11 seats + coordinator) while vAdamSolutions has 11
+    // KristaTech layout: vAdamMiners may carry N+1 entries (11 seats Pre-Model D / 15 seats Balanced Model D + coordinator) while vAdamSolutions has N
     const seatCount =
       miners.length === solutions.length + 1 ? solutions.length : miners.length
 

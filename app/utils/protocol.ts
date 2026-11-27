@@ -11,6 +11,11 @@ export interface MilestoneInfo {
 }
 
 export interface CoordinatorWeightSummary {
+  isModelD: boolean
+  vrfVersion: 'ADAM_FAIR_COORD_V5' | 'ADAM_FAIR_COORD_V4'
+  mnFloorPct: number
+  mnFloorCondition: string
+  vrfKeyMaturityBlocks: number
   mnWeightEach: number
   effectiveMnWeightEach: number
   coinLockWeightEach: number
@@ -31,8 +36,21 @@ export interface CoordinatorWeightSummary {
   mnFloorApplied: boolean
 }
 
+export interface AdamTrackSpec {
+  isModelD: boolean
+  committeeSize: number
+  masternodeQuota: number
+  coinLockQuota: number
+  openPowQuota: number
+  zeroCoinMaxSeats: number
+  threshold: number
+  committeePoolPct: number
+  perSeatNetPct: number
+}
+
 export const TARGET_BLOCK_TIME_SECONDS = 30
 export const DECAY_INTERVAL_BLOCKS = 259200
+export const MODEL_D_ACTIVATION_HEIGHT = 5000
 export const ADAM_COORD_WEIGHT_MASTERNODE = 4200
 export const ADAM_COORD_WEIGHT_COIN_LOCK = 250
 export const ADAM_COORD_WEIGHT_POW_LOCK = 10
@@ -40,18 +58,76 @@ export const ADAM_MASTERNODE_TRACK_QUOTA = 7
 export const ADAM_COIN_LOCK_TRACK_QUOTA = 1
 export const ADAM_OPEN_POW_TRACK_QUOTA = 3
 export const ADAM_COMMITTEE_SIZE = 11
+export const ADAM_MODELD_MASTERNODE_TRACK_QUOTA = 8
+export const ADAM_MODELD_COIN_LOCK_TRACK_QUOTA = 2
+export const ADAM_MODELD_OPEN_POW_TRACK_QUOTA = 5
+export const ADAM_MODELD_ZERO_COIN_OPEN_SEATS = 2
+export const ADAM_MODELD_COMMITTEE_SIZE = 15
+export const ADAM_VRF_KEY_MATURITY_BLOCKS = 100
 export const ADAM_PUZZLE_ALGO_COUNT = 17
 export const ADAM_V12_PERMUTATION_COUNT = 4080
 
 /**
- * Dynamic BFT LLMQ quorum sizing matching src/llmq.cpp:GetTargetQuorumSize.
+ * Returns Pre-Model D (11+1) or Balanced Model D (15+1) track quotas and thresholds.
  */
-export function getDynamicLlmqSpec(activeMnCount: number): { size: number; threshold: number } {
+export function getAdamTrackSpec(height: number): AdamTrackSpec {
+  const h = Math.max(0, Math.floor(Number(height) || 0))
+  if (h >= MODEL_D_ACTIVATION_HEIGHT) {
+    return {
+      isModelD: true,
+      committeeSize: ADAM_MODELD_COMMITTEE_SIZE,
+      masternodeQuota: ADAM_MODELD_MASTERNODE_TRACK_QUOTA,
+      coinLockQuota: ADAM_MODELD_COIN_LOCK_TRACK_QUOTA,
+      openPowQuota: ADAM_MODELD_OPEN_POW_TRACK_QUOTA,
+      zeroCoinMaxSeats: ADAM_MODELD_ZERO_COIN_OPEN_SEATS,
+      threshold: 8,
+      committeePoolPct: 60,
+      perSeatNetPct: 4
+    }
+  }
+  return {
+    isModelD: false,
+    committeeSize: ADAM_COMMITTEE_SIZE,
+    masternodeQuota: ADAM_MASTERNODE_TRACK_QUOTA,
+    coinLockQuota: ADAM_COIN_LOCK_TRACK_QUOTA,
+    openPowQuota: ADAM_OPEN_POW_TRACK_QUOTA,
+    zeroCoinMaxSeats: 1,
+    threshold: 7,
+    committeePoolPct: h >= 200 ? 75 : 0,
+    perSeatNetPct: h >= 200 ? 6.82 : 0
+  }
+}
+
+/**
+ * Avoids walking back to Genesis block 0 when the chain height is within the default 120-block
+ * hashrate lookup window, preventing Genesis timestamp gaps from collapsing reported hashrate.
+ */
+export function getSafeHashrateLookupWindow(height: number, defaultLookup = 120): number {
+  const h = Math.max(0, Math.floor(Number(height) || 0))
+  const windowSize = Math.max(1, Math.floor(Number(defaultLookup) || 120))
+  if (h >= 2 && h <= windowSize) {
+    return h - 1
+  }
+  return windowSize
+}
+
+/**
+ * Dynamic BFT LLMQ quorum sizing matching src/llmq.cpp:GetTargetQuorumSize & GetQuorumThreshold.
+ * Hardening v4 (height >= 1) enforces 2/3 BFT supermajority: floor(2N/3) + 1.
+ */
+export function getDynamicLlmqSpec(
+  activeMnCount: number,
+  hardeningV4 = true
+): { size: number; threshold: number } {
   const count = Math.max(0, Math.floor(Number(activeMnCount) || 0))
-  if (count >= 100) return { size: 15, threshold: 8 }
-  if (count >= 50) return { size: 11, threshold: 6 }
-  if (count >= 25) return { size: 9, threshold: 5 }
-  return { size: 5, threshold: 3 }
+  let size = 5
+  if (count >= 100) size = 15
+  else if (count >= 50) size = 11
+  else if (count >= 25) size = 9
+
+  const rawThreshold = hardeningV4 ? Math.floor((2 * size) / 3) + 1 : Math.floor(size / 2) + 1
+  const threshold = Math.min(size, Math.max(2, rawThreshold))
+  return { size, threshold }
 }
 
 export function toSatoshi(amount: number | null | undefined): number {
@@ -172,8 +248,8 @@ export function buildConsensusInfo(height: number): MilestoneInfo {
       currentEraTr: 'PoMBL (Blok v12)',
       algorithmLabel: 'PoMBL v12 • 17-Algo 3-Perm (4,080)',
       nextHeight: 5000,
-      nextLabel: 'UPGRADE_MODELD / ADAM v2 (PoBLS + Dynamic LLMQ)',
-      nextLabelTr: 'UPGRADE_MODELD / ADAM v2 (PoBLS + Dinamik LLMQ)',
+      nextLabel: 'Balanced Model D / ADAM v2 (15+1 • 5/10/60/25)',
+      nextLabelTr: 'Dengeli Model D / ADAM v2 (15+1 • 5/10/60/25)',
       progressPct: Math.min(100, Math.round(((h - 4800) / 200) * 1000) / 10),
       blocksRemaining: rem,
       etaSeconds: rem * TARGET_BLOCK_TIME_SECONDS
@@ -185,9 +261,9 @@ export function buildConsensusInfo(height: number): MilestoneInfo {
   const nextHeight = start + DECAY_INTERVAL_BLOCKS
   const rem = nextHeight - h
   return {
-    currentEra: period === 0 ? 'Model D (PoBLS + Dynamic LLMQ)' : `Model D • Epoch #${period + 1}`,
-    currentEraTr: period === 0 ? 'Model D (PoBLS + Dinamik LLMQ)' : `Model D • Dönem #${period + 1}`,
-    algorithmLabel: 'Model D • 4,200:250:10 Fair VRF',
+    currentEra: period === 0 ? 'Balanced Model D (PoBLS + 2/3 BFT LLMQ)' : `Balanced Model D • Epoch #${period + 1}`,
+    currentEraTr: period === 0 ? 'Dengeli Model D (PoBLS + 2/3 BFT LLMQ)' : `Dengeli Model D • Dönem #${period + 1}`,
+    algorithmLabel: 'Model D • 15+1 & 4,200:250:10 VRF (≥55% MN)',
     nextHeight,
     nextLabel: `Emission Decay Epoch #${period + 2} (-2.15%)`,
     nextLabelTr: `Emisyon Azaltım Dönemi #${period + 2} (-%2.15)`,
@@ -212,6 +288,7 @@ export function calculateModelDSplits(height: number, customSubsidy?: number, ac
       llmqTotal: 0,
       llmqPerSigner: 0,
       llmqQuorumSize: 0,
+      committeeSeats: 0,
       committeeTotal: 0,
       committeeSeatEach: 0,
       mnSeatEach: 0,
@@ -235,6 +312,7 @@ export function calculateModelDSplits(height: number, customSubsidy?: number, ac
       llmqTotal: 0,
       llmqPerSigner: 0,
       llmqQuorumSize: 0,
+      committeeSeats: 0,
       committeeTotal: 0,
       committeeSeatEach: 0,
       mnSeatEach: 0,
@@ -261,6 +339,7 @@ export function calculateModelDSplits(height: number, customSubsidy?: number, ac
       llmqTotal: 0,
       llmqPerSigner: 0,
       llmqQuorumSize: 0,
+      committeeSeats: ADAM_COMMITTEE_SIZE,
       committeeTotal: fromSatoshi(committeeSats),
       committeeSeatEach,
       mnSeatEach: committeeSeatEach,
@@ -269,16 +348,16 @@ export function calculateModelDSplits(height: number, customSubsidy?: number, ac
     }
   }
 
-  // UPGRADE_FAIRNESS Model D: 35% Passive MN, 40% Equal-Pay Committee (11 seats), 15% Producer (PoS 12%+3%), 10% Signer-Only LLMQ
-  const passiveMnSats = Math.floor((netPoolSats * 35) / 100)
-  const committeeSats = Math.floor((netPoolSats * 40) / 100)
+  // UPGRADE_FAIRNESS Balanced Model D: 5% Passive MN, 10% Signer-Only LLMQ, 60% Equal-Pay Committee (15 seats), 25% Producer (PoS 22%+3%)
+  const passiveMnSats = Math.floor((netPoolSats * 5) / 100)
+  const committeeSats = Math.floor((netPoolSats * 60) / 100)
   const llmqSats = Math.floor((netPoolSats * 10) / 100)
   const producerSats = netPoolSats - passiveMnSats - committeeSats - llmqSats
   const posCoordinatorSats = Math.floor((netPoolSats * 3) / 100)
   const posStakerSats = producerSats - posCoordinatorSats
 
   const llmqSpec = getDynamicLlmqSpec(activeMnCount)
-  const committeeSeatEach = fromSatoshi(Math.floor(committeeSats / ADAM_COMMITTEE_SIZE))
+  const committeeSeatEach = fromSatoshi(Math.floor(committeeSats / ADAM_MODELD_COMMITTEE_SIZE))
 
   return {
     subsidy: fromSatoshi(totalSats),
@@ -291,6 +370,7 @@ export function calculateModelDSplits(height: number, customSubsidy?: number, ac
     llmqTotal: fromSatoshi(llmqSats),
     llmqPerSigner: fromSatoshi(Math.floor(llmqSats / llmqSpec.size)),
     llmqQuorumSize: llmqSpec.size,
+    committeeSeats: ADAM_MODELD_COMMITTEE_SIZE,
     committeeTotal: fromSatoshi(committeeSats),
     committeeSeatEach,
     mnSeatEach: committeeSeatEach,
@@ -300,15 +380,21 @@ export function calculateModelDSplits(height: number, customSubsidy?: number, ac
 }
 
 /**
- * Computes exact UPGRADE_FAIRNESS (ADAM_FAIR_COORD_V4, src/adam.cpp:2226-2269)
- * proportional locked-capital Coordinator VRF weights (`4,200 : 250 : 10`) with
- * zero per-track caps and an exact >= 75% Active MN floor when 3 * sumNonMN > sumMN.
+ * Computes exact UPGRADE_FAIRNESS Coordinator VRF weights (`4,200 : 250 : 10`, src/adam.cpp:2563-2594):
+ * - Pre-Model D (< 5,000, ADAM_FAIR_COORD_V4): >= 75% Active MN floor when 3 * sumNonMN > sumMN
+ * - Balanced Model D (>= 5,000, ADAM_FAIR_COORD_V5): >= 55% Active MN floor when 11 * sumNonMN > 9 * sumMN
+ * - Zero per-track caps; Hardening v4 enforces 100-block key maturity for VRF eligibility.
  */
-export function calculateCoordinatorWeights(counts: {
-  masternode?: number
-  coin_lock?: number
-  pow_lock?: number
-}): CoordinatorWeightSummary {
+export function calculateCoordinatorWeights(
+  counts: {
+    masternode?: number
+    coin_lock?: number
+    pow_lock?: number
+  },
+  height = MODEL_D_ACTIVATION_HEIGHT
+): CoordinatorWeightSummary {
+  const h = Math.max(0, Math.floor(Number(height) || 0))
+  const isModelD = h >= MODEL_D_ACTIVATION_HEIGHT
   const activeMnCount = Math.max(0, Math.floor(counts.masternode || 0))
   const eligibleCoinLockSeats = Math.max(0, Math.floor(counts.coin_lock || 0))
   const eligiblePowLockSeats = Math.max(0, Math.floor(counts.pow_lock || 0))
@@ -318,7 +404,9 @@ export function calculateCoordinatorWeights(counts: {
   const sumPl = BigInt(eligiblePowLockSeats) * BigInt(ADAM_COORD_WEIGHT_POW_LOCK)
   const sumNonMn = sumCl + sumPl
 
-  const mnFloorApplied = sumMn > 0n && sumNonMn > 0n && 3n * sumNonMn > sumMn
+  const mnFloorApplied = isModelD
+    ? sumMn > 0n && sumNonMn > 0n && 11n * sumNonMn > 9n * sumMn
+    : sumMn > 0n && sumNonMn > 0n && 3n * sumNonMn > sumMn
 
   let totalMnScaled = sumMn
   let totalClScaled = sumCl
@@ -326,10 +414,17 @@ export function calculateCoordinatorWeights(counts: {
   let effectiveMnWeightEach = activeMnCount > 0 ? ADAM_COORD_WEIGHT_MASTERNODE : 0
 
   if (mnFloorApplied) {
-    totalMnScaled = sumMn * 3n * sumNonMn
-    totalClScaled = sumCl * sumMn
-    totalPlScaled = sumPl * sumMn
-    effectiveMnWeightEach = Math.round(((3 * Number(sumNonMn)) / activeMnCount) * 100) / 100
+    if (isModelD) {
+      totalMnScaled = sumMn * 11n * sumNonMn
+      totalClScaled = sumCl * 9n * sumMn
+      totalPlScaled = sumPl * 9n * sumMn
+      effectiveMnWeightEach = Math.round((((11 / 9) * Number(sumNonMn)) / activeMnCount) * 100) / 100
+    } else {
+      totalMnScaled = sumMn * 3n * sumNonMn
+      totalClScaled = sumCl * sumMn
+      totalPlScaled = sumPl * sumMn
+      effectiveMnWeightEach = Math.round(((3 * Number(sumNonMn)) / activeMnCount) * 100) / 100
+    }
   }
 
   const totalScaled = totalMnScaled + totalClScaled + totalPlScaled
@@ -351,6 +446,11 @@ export function calculateCoordinatorWeights(counts: {
   const totalPowLockWeight = Number(sumPl)
 
   return {
+    isModelD,
+    vrfVersion: isModelD ? 'ADAM_FAIR_COORD_V5' : 'ADAM_FAIR_COORD_V4',
+    mnFloorPct: isModelD ? 55 : 75,
+    mnFloorCondition: isModelD ? '11×Non-MN > 9×MN' : '3×Non-MN > MN',
+    vrfKeyMaturityBlocks: ADAM_VRF_KEY_MATURITY_BLOCKS,
     mnWeightEach: ADAM_COORD_WEIGHT_MASTERNODE,
     effectiveMnWeightEach,
     coinLockWeightEach: ADAM_COORD_WEIGHT_COIN_LOCK,

@@ -6,6 +6,7 @@ import {
   buildConsensusInfo,
   calculateBlockSubsidy,
   calculateTotalSupply,
+  getSafeHashrateLookupWindow,
   TARGET_BLOCK_TIME_SECONDS
 } from '../../app/utils/protocol'
 
@@ -194,9 +195,11 @@ async function fetchStatusData(): Promise<any> {
     info = await callRpc('getinfo')
   } catch (_) {}
 
+  const knownHeight = blockchainInfo?.blocks ?? indexedHeight
   let hashrate = 0
   try {
-    const hps = await callRpc('getnetworkhashps')
+    const lookupBlocks = getSafeHashrateLookupWindow(knownHeight)
+    const hps = await callRpc('getnetworkhashps', lookupBlocks === 120 ? [] : [lookupBlocks])
     if (typeof hps === 'number' && Number.isFinite(hps) && hps >= 0) {
       hashrate = hps
     }

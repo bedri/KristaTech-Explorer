@@ -15,7 +15,7 @@ export function buildOpenApiSpec(serverUrl = 'https://explorer.kristalteknoloji.
       title: 'KristaTech (KRISTA) Blockchain Explorer API',
       version: '2.1.0',
       description:
-        'Public REST & Server-Sent Events (SSE) API for the KristaTech (KRISTA) hybrid PoW/PoS ADAM 11+1 blockchain, supporting wallets, exchanges, validator monitors, MESCAL Taproot contracts, and supply trackers.'
+        'Public REST & Server-Sent Events (SSE) API for the KristaTech (KRISTA) hybrid PoW/PoS ADAM (11+1 Pre-Model D / 15+1 Balanced Model D) blockchain, supporting wallets, exchanges, validator monitors, MESCAL Taproot contracts, and supply trackers.'
     },
     servers: [
       {

@@ -2,13 +2,12 @@ import { callRpc } from '../utils/rpc'
 import { dbGet } from '../utils/db'
 import { BoundedTtlCache, setCacheControl } from '../utils/api'
 import {
-  ADAM_COIN_LOCK_TRACK_QUOTA,
+  type AdamTrackSpec,
   ADAM_COORD_WEIGHT_COIN_LOCK,
-  ADAM_COORD_WEIGHT_MASTERNODE,
   ADAM_COORD_WEIGHT_POW_LOCK,
-  ADAM_MASTERNODE_TRACK_QUOTA,
-  ADAM_OPEN_POW_TRACK_QUOTA,
+  MODEL_D_ACTIVATION_HEIGHT,
   calculateCoordinatorWeights,
+  getAdamTrackSpec,
   maskPeerAddr
 } from '../../app/utils/protocol'
 
@@ -77,7 +76,7 @@ export async function getValidatorPoolData() {
     }
   }
 
-  const coordinatorVrf = calculateCoordinatorWeights(summary)
+  const coordinatorVrf = calculateCoordinatorWeights(summary, currentHeight)
 
   const validators = rawList.map((entry: any, idx: number) => {
     const track = String(entry?.track || 'bootstrap')
@@ -116,7 +115,7 @@ export async function getValidatorPoolData() {
         quorumHash: qRes.quorumHash || '',
         dkgHeight: qRes.dkgHeight ?? 0,
         seedHeight: qRes.seedHeight ?? 0,
-        threshold: qRes.threshold ?? 3,
+        threshold: qRes.threshold ?? 4,
         developerFundAddress: qRes.developerFundAddress || '',
         treasuryGovernanceStartHeight: qRes.treasuryGovernanceStartHeight ?? 5000,
         members: Array.isArray(qRes.members)
@@ -253,35 +252,50 @@ export async function getValidatorPoolData() {
   }
 
   const openPowAvailable = summary.pow_lock + summary.zerocoin_pow + summary.bootstrap
-  const quotas = {
-    masternode: {
-      used: Math.min(ADAM_MASTERNODE_TRACK_QUOTA, summary.masternode),
-      available: summary.masternode,
-      max: ADAM_MASTERNODE_TRACK_QUOTA,
-      rewardShareNetPct: 25.45,
-      perSeatNetPct: 3.64
-    },
-    coinLock: {
-      used: Math.min(ADAM_COIN_LOCK_TRACK_QUOTA, summary.coin_lock),
-      available: summary.coin_lock,
-      max: ADAM_COIN_LOCK_TRACK_QUOTA,
-      rewardShareNetPct: 3.64,
-      perSeatNetPct: 3.64
-    },
-    openPow: {
-      used: Math.min(ADAM_OPEN_POW_TRACK_QUOTA, openPowAvailable),
-      available: openPowAvailable,
-      max: ADAM_OPEN_POW_TRACK_QUOTA,
-      rewardShareNetPct: 10.91,
-      perSeatNetPct: 3.64
+  const buildQuotaSummary = (spec: AdamTrackSpec) => {
+    const sharePct = (seats: number) =>
+      spec.committeeSize > 0
+        ? Math.round(((seats * spec.committeePoolPct) / spec.committeeSize) * 100) / 100
+        : 0
+    return {
+      isModelD: spec.isModelD,
+      committeeSize: spec.committeeSize,
+      threshold: spec.threshold,
+      committeePoolPct: spec.committeePoolPct,
+      masternode: {
+        used: Math.min(spec.masternodeQuota, summary.masternode),
+        available: summary.masternode,
+        max: spec.masternodeQuota,
+        rewardShareNetPct: sharePct(spec.masternodeQuota),
+        perSeatNetPct: spec.perSeatNetPct
+      },
+      coinLock: {
+        used: Math.min(spec.coinLockQuota, summary.coin_lock),
+        available: summary.coin_lock,
+        max: spec.coinLockQuota,
+        rewardShareNetPct: sharePct(spec.coinLockQuota),
+        perSeatNetPct: spec.perSeatNetPct
+      },
+      openPow: {
+        used: Math.min(spec.openPowQuota, openPowAvailable),
+        available: openPowAvailable,
+        max: spec.openPowQuota,
+        zeroCoinMaxSeats: spec.zeroCoinMaxSeats,
+        rewardShareNetPct: sharePct(spec.openPowQuota),
+        perSeatNetPct: spec.perSeatNetPct
+      }
     }
   }
+
+  const quotas = buildQuotaSummary(getAdamTrackSpec(currentHeight))
+  const modelDQuotas = buildQuotaSummary(getAdamTrackSpec(MODEL_D_ACTIVATION_HEIGHT))
 
   return {
     success: true,
     height: currentHeight,
     summary,
     quotas,
+    modelDQuotas,
     coordinatorVrf,
     validators,
     quorum,

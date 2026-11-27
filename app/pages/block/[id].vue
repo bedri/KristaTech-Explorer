@@ -73,23 +73,21 @@ function rewardRoleLabel(role) {
   switch (role) {
     case 'staker':
       return isPreModelD
-        ? t('roleStaker').replace('12%', '20%').replace('%12', '%20')
+        ? t('roleStaker').replace('22%', '20%').replace('%22', '%20')
         : t('roleStaker')
     case 'coordinator':
       return isPreModelD
         ? t('roleCoordinator').replace('3%', '5%').replace('%3', '%5')
         : t('roleCoordinator')
     case 'producer':
-      return isPreModelD
-        ? t('roleProducer').replace('15%', '25%').replace('%15', '%25')
-        : t('roleProducer')
+      return t('roleProducer')
     case 'masternode':
       return t('roleMasternode')
     case 'llmq':
       return t('roleLlmq')
     case 'committee':
       return isPreModelD
-        ? t('roleCommittee').replace('40%', '75%').replace('%40', '%75')
+        ? t('roleCommittee').replace('60% / 15', '75% / 11').replace('%60 / 15', '%75 / 11')
         : t('roleCommittee')
     case 'treasury':
       return t('roleTreasury')
@@ -311,7 +309,7 @@ function copyToClipboard(text, label = 'Content') {
               {{ solvedSeatsCount }} / {{ committeeSeats.length }} {{ t('seatSolved') }}
             </span>
             <span class="px-2.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-xs font-semibold">
-              {{ result.block.height >= 5000 ? 'Model D / ADAM v2 (PoBLS + LLMQ)' : result.block.version >= 12 ? 'PoMBL (v12 17-Algo 3-Perm)' : t('activeConsensus') }}
+              {{ result.block.height >= 5000 ? 'Balanced Model D / ADAM v2 (15+1 • PoBLS + 2/3 BFT LLMQ)' : result.block.version >= 12 ? 'PoMBL (v12 17-Algo 3-Perm)' : t('activeConsensus') }}
             </span>
           </div>
         </div>

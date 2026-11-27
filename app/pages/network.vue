@@ -283,12 +283,12 @@ const volumeBars = computed(() => {
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.treasury, 4) }}</div>
         </div>
         <div class="p-3.5 rounded-xl bg-brand-blue/10 border border-brand-blue/20">
-          <div class="text-brand-blue font-semibold">Passive MN ({{ simHeight >= 5000 ? '35%' : '0%' }})</div>
+          <div class="text-brand-blue font-semibold">Passive MN ({{ simHeight >= 5000 ? '5%' : '0%' }})</div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.passiveMn, 4) }}</div>
         </div>
         <div class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
           <div class="text-purple-700 dark:text-purple-300 font-semibold">
-            Producer ({{ simHeight >= 5000 ? '15%' : simHeight >= 200 ? '25%' : '100%' }})
+            Producer ({{ simHeight >= 200 ? '25%' : '100%' }})
           </div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.producer, 4) }}</div>
           <div v-if="simHeight >= 200" class="text-[10px] text-slate-500 mt-0.5">
@@ -306,11 +306,11 @@ const volumeBars = computed(() => {
         </div>
         <div class="p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
           <div class="text-sky-700 dark:text-sky-300 font-semibold">
-            11 Seat Pool ({{ simHeight >= 5000 ? '40%' : simHeight >= 200 ? '75%' : '0%' }})
+            {{ simSplits.committeeSeats || 15 }} Seat Pool ({{ simHeight >= 5000 ? '60%' : simHeight >= 200 ? '75%' : '0%' }})
           </div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.committeeTotal, 4) }}</div>
           <div class="text-[10px] text-slate-500 mt-0.5">
-            Equal Pay: {{ simSplits.committeeSeatEach }} / seat (1/11)
+            {{ simHeight >= 200 ? `Equal Pay: ${simSplits.committeeSeatEach} / seat (1/${simSplits.committeeSeats})` : 'Bootstrap PoW (#0–#199)' }}
           </div>
         </div>
       </div>

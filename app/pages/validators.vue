@@ -111,7 +111,7 @@ function trackLabel(track) {
       </button>
     </div>
 
-    <!-- Dual-Track Committee Quota Cards (7 MN + 1 Coin-Lock + 3 Open PoW) -->
+    <!-- Dual-Track Committee Quota Cards (7/1/3 Pre-Model D -> 8/2/5 Balanced Model D) -->
     <div v-if="valData?.quotas" class="grid grid-cols-1 md:grid-cols-3 gap-5">
       <div class="glass-card rounded-xl p-5 space-y-3 border-t-4 border-t-purple-500">
         <div class="flex items-center justify-between">
@@ -131,8 +131,11 @@ function trackLabel(track) {
             :style="{ width: `${Math.min(100, (valData.quotas.masternode.used / valData.quotas.masternode.max) * 100)}%` }"
           ></div>
         </div>
-        <p class="text-xs text-slate-500 dark:text-slate-400">
-          Model D Net Pool: <strong>25.45%</strong> (Equal 3.64% / seat) • <strong>4,200</strong> VRF weight (KTDIP3)
+        <p v-if="valData.quotas.isModelD" class="text-xs text-slate-500 dark:text-slate-400">
+          Model D Net Pool: <strong>{{ valData.quotas.masternode.rewardShareNetPct }}%</strong> (Equal {{ valData.quotas.masternode.perSeatNetPct }}% / seat) • <strong>4,200</strong> VRF weight (KTDIP3)
+        </p>
+        <p v-else class="text-xs text-slate-500 dark:text-slate-400">
+          Active (#200+): <strong>{{ valData.quotas.masternode.rewardShareNetPct }}%</strong> ({{ valData.quotas.masternode.perSeatNetPct }}% / seat) • Model D #5,000: <strong>{{ valData.modelDQuotas?.masternode?.max || 8 }} seats ({{ valData.modelDQuotas?.masternode?.rewardShareNetPct || 32 }}%)</strong> • <strong>4,200</strong> VRF
         </p>
       </div>
 
@@ -142,7 +145,7 @@ function trackLabel(track) {
             Sub-Track 1B • Coin-Lock
           </span>
           <span class="text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
-            {{ valData.quotas.coinLock.used }} / {{ valData.quotas.coinLock.max }} seat
+            {{ valData.quotas.coinLock.used }} / {{ valData.quotas.coinLock.max }} {{ valData.quotas.coinLock.max === 1 ? 'seat' : 'seats' }}
           </span>
         </div>
         <div class="text-2xl font-extrabold text-slate-800 dark:text-white">
@@ -154,8 +157,11 @@ function trackLabel(track) {
             :style="{ width: `${Math.min(100, (valData.quotas.coinLock.used / valData.quotas.coinLock.max) * 100)}%` }"
           ></div>
         </div>
-        <p class="text-xs text-slate-500 dark:text-slate-400">
-          Model D Net Pool: <strong>3.64%</strong> (Equal 40%/11 / seat) • <strong>250</strong> VRF weight (uncapped)
+        <p v-if="valData.quotas.isModelD" class="text-xs text-slate-500 dark:text-slate-400">
+          Model D Net Pool: <strong>{{ valData.quotas.coinLock.rewardShareNetPct }}%</strong> (Equal {{ valData.quotas.coinLock.perSeatNetPct }}% / seat; 60%/15) • <strong>250</strong> VRF weight (uncapped)
+        </p>
+        <p v-else class="text-xs text-slate-500 dark:text-slate-400">
+          Active (#200+): <strong>{{ valData.quotas.coinLock.rewardShareNetPct }}%</strong> ({{ valData.quotas.coinLock.perSeatNetPct }}% / seat) • Model D #5,000: <strong>{{ valData.modelDQuotas?.coinLock?.max || 2 }} seats ({{ valData.modelDQuotas?.coinLock?.rewardShareNetPct || 8 }}%)</strong> • <strong>250</strong> VRF
         </p>
       </div>
 
@@ -177,8 +183,11 @@ function trackLabel(track) {
             :style="{ width: `${Math.min(100, (valData.quotas.openPow.used / valData.quotas.openPow.max) * 100)}%` }"
           ></div>
         </div>
-        <p class="text-xs text-slate-500 dark:text-slate-400">
-          Model D Net Pool: <strong>10.91%</strong> (Equal 3.64% / seat; 2 Funded + 1 Open-Entry @ #2,500) • <strong>10</strong> VRF weight / Funded PoW-Lock
+        <p v-if="valData.quotas.isModelD" class="text-xs text-slate-500 dark:text-slate-400">
+          Model D Net Pool: <strong>{{ valData.quotas.openPow.rewardShareNetPct }}%</strong> (3 Funded + {{ valData.quotas.openPow.zeroCoinMaxSeats ?? 2 }} Zero-Coin • {{ valData.quotas.openPow.perSeatNetPct }}% / seat) • <strong>10</strong> VRF
+        </p>
+        <p v-else class="text-xs text-slate-500 dark:text-slate-400">
+          Active (#200+): <strong>{{ valData.quotas.openPow.rewardShareNetPct }}%</strong> (2 Funded + 1 Open @ #2,500) • Model D #5,000: <strong>{{ valData.modelDQuotas?.openPow?.max || 5 }} seats (3 Funded + 2 Zero-Coin, {{ valData.modelDQuotas?.openPow?.rewardShareNetPct || 20 }}%)</strong> • <strong>10</strong> VRF
         </p>
       </div>
     </div>
@@ -189,14 +198,19 @@ function trackLabel(track) {
         <div>
           <h2 class="text-lg font-bold text-slate-800 dark:text-white flex flex-wrap items-center gap-2">
             <span>{{ t('coordVrfTitle') }}</span>
+            <span class="px-2 py-0.5 rounded bg-brand-blue/15 text-brand-blue text-[11px] font-bold">
+              {{ valData.coordinatorVrf.isModelD ? '≥55% MN Floor (Model D V5)' : '≥75% Pre-Model D (V4) → ≥55% @ #5,000 (V5)' }}
+            </span>
             <span
               v-if="valData.coordinatorVrf.mnFloorApplied"
               class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold"
             >
-              {{ t('mnFloorBadge') }}
+              ≥{{ valData.coordinatorVrf.mnFloorPct }}% {{ t('mnFloorBadge') }}
             </span>
           </h2>
-          <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300">{{ t('coordVrfDesc') }}</p>
+          <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
+            {{ valData.coordinatorVrf.isModelD ? t('coordVrfDesc') : t('coordVrfDescPreModelD') }}
+          </p>
         </div>
         <span class="text-xs font-mono px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 font-semibold">
           Total Pool Weight: {{ formatNumber(valData.coordinatorVrf.totalPoolWeight, 0) }}
