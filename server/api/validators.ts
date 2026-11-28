@@ -118,7 +118,7 @@ export async function getValidatorPoolData() {
         seedHeight: qRes.seedHeight ?? 0,
         threshold: qRes.threshold ?? 4,
         developerFundAddress: qRes.developerFundAddress || '',
-        treasuryGovernanceStartHeight: qRes.treasuryGovernanceStartHeight ?? 5000,
+        treasuryGovernanceStartHeight: qRes.treasuryGovernanceStartHeight ?? MODEL_D_ACTIVATION_HEIGHT,
         members: Array.isArray(qRes.members)
           ? qRes.members.map((m: any, i: number) => ({
               rank: m.rank ?? i + 1,

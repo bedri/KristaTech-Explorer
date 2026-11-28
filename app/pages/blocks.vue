@@ -211,7 +211,7 @@ function goToPage(p) {
               <td class="p-3.5 text-slate-700 dark:text-gray-300 whitespace-nowrap">{{ block.tx_count }}</td>
               <td class="p-3.5 whitespace-nowrap text-xs font-mono">
                 <span v-if="block.height >= 200" class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold">
-                  {{ block.solved_seats }}/{{ block.height >= 5000 ? 15 : 11 }}
+                  {{ block.solved_seats }}/15
                 </span>
                 <span v-else class="text-slate-400">v{{ block.version }}</span>
               </td>

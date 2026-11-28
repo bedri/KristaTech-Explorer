@@ -21,7 +21,6 @@ export const ALLOWED_RPC_METHODS = new Set([
   'getadamminers',
   'getadaminfo',
   'getactivequorum',
-  'spork',
   'getblockhash',
   'getblock',
   'getrawtransaction',
@@ -123,12 +122,6 @@ export async function broadcastRawTransaction(rawHex: string): Promise<string> {
 export function assertAllowedRpcMethod(method: string, params: any[] = []): void {
   if (!ALLOWED_RPC_METHODS.has(method)) {
     throw new Error(`Disallowed RPC method: ${method}`)
-  }
-  if (method === 'spork') {
-    const subcmd = String(params[0] ?? '')
-    if (subcmd !== 'show' && subcmd !== 'active') {
-      throw new Error(`Disallowed spork subcommand: ${subcmd}`)
-    }
   }
   if (method === 'protx') {
     const subcmd = String(params[0] ?? '')

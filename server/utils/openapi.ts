@@ -15,7 +15,7 @@ export function buildOpenApiSpec(serverUrl = 'https://explorer.kristalteknoloji.
       title: 'KristaTech (KRISTA) Blockchain Explorer API',
       version: '2.1.0',
       description:
-        'Public REST & Server-Sent Events (SSE) API for the KristaTech (KRISTA) hybrid PoW/PoS ADAM (15+1 Balanced Model D / 11+1 Pre-Model D) blockchain, supporting wallets, exchanges, validator monitors, MESCAL Taproot contracts, and supply trackers.'
+        'Public REST & Server-Sent Events (SSE) API for the KristaTech (KRISTA) hybrid PoW/PoS ADAM (15+1 Balanced Model D) blockchain, supporting wallets, exchanges, validator monitors, MESCAL Taproot contracts, and supply trackers.'
     },
     servers: [
       {
@@ -111,7 +111,7 @@ export function buildOpenApiSpec(serverUrl = 'https://explorer.kristalteknoloji.
       '/api/network': {
         get: {
           tags: ['Chain Telemetry'],
-          summary: '60-block series, consensus roadmap, Model D splits, privacy-masked BIP324 v2 peer mesh, and Sporks',
+          summary: '60-block series, consensus roadmap, Model D splits, privacy-masked BIP324 v2 peer mesh, and active protocol upgrades',
           responses: {
             '200': { description: 'Network analytics payload' },
             '500': { description: 'Failed to load network analytics' }

@@ -3,6 +3,7 @@ import { dbQuery } from '../utils/db'
 import { setCacheControl } from '../utils/api'
 import { getCachedStatusData } from './status'
 import {
+  MODEL_D_ACTIVATION_HEIGHT,
   calculateBlockSubsidy,
   calculateModelDSplits,
   hasBip324ServiceFlag,
@@ -13,8 +14,6 @@ import {
 const NETWORK_CACHE_TTL_MS = 5000
 let cachedNetwork: any = null
 let cachedNetworkTime = 0
-
-const SPORK_DEFAULT_OFF = 4070908800
 
 export default defineEventHandler(async (event) => {
   setCacheControl(event, 5, 10)
@@ -92,23 +91,24 @@ export default defineEventHandler(async (event) => {
     }
     const bip324PeersCount = peers.filter((p) => p.bip324).length
 
-    // Fetch protocol Sporks
-    let sporks: any[] = []
+    // Fetch live protocol upgrade activations from getblockchaininfo
+    let upgrades: any[] = []
     try {
-      const rawSporks = await callRpc('spork', ['show'])
-      if (rawSporks && typeof rawSporks === 'object') {
-        sporks = Object.entries(rawSporks).map(([name, val]) => {
-          const numVal = Number(val)
-          const isActive = Number.isFinite(numVal) && numVal < SPORK_DEFAULT_OFF
-          return {
+      const bcInfo = await callRpc('getblockchaininfo')
+      const rawUpgrades = bcInfo?.upgrades
+      if (rawUpgrades && typeof rawUpgrades === 'object') {
+        upgrades = Object.entries(rawUpgrades)
+          .map(([name, entry]: [string, any]) => ({
             name,
-            value: numVal,
-            active: isActive
-          }
-        })
+            activationHeight: Number(entry?.activationheight ?? entry?.activationHeight ?? 0),
+            status: String(entry?.status || 'pending'),
+            active: String(entry?.status || '').toLowerCase() === 'active',
+            info: String(entry?.info || '')
+          }))
+          .sort((a, b) => a.activationHeight - b.activationHeight || a.name.localeCompare(b.name))
       }
     } catch (_) {
-      sporks = []
+      upgrades = []
     }
 
     // Consensus upgrade roadmap milestones
@@ -116,42 +116,34 @@ export default defineEventHandler(async (event) => {
       {
         id: 'bootstrap',
         height: 1,
-        title: 'Fair Launch, KTDIP3, BIP324 & Hardening v3/v4',
-        titleTr: 'Adil Başlangıç, KTDIP3, BIP324 ve Hardening v3/v4',
-        desc: '0 premine, deterministic KTDIP3 v2 BLS PoP (mnmeta), BIP324 P2P v2, PoM/PoL/PoB, 4,200:250:10 VRF (100-blk key maturity), ProUpReg cooldown, and 2/3 BFT LLMQ.',
-        descTr: '0 ön madencilik, deterministik KTDIP3 v2 BLS PoP (mnmeta), BIP324 P2P v2, PoM/PoL/PoB, 4.200:250:10 VRF (100-blok olgunluk), ProUpReg bekleme ve 2/3 BFT LLMQ.'
-      },
-      {
-        id: 'adam_v1',
-        height: 200,
-        title: 'UPGRADE_ADAM & Dual-Track (25% / 75%)',
-        titleTr: 'UPGRADE_ADAM & Çift Kulvar (%25 / %75)',
-        desc: '11+1 Pre-Model D committee (7 MN / 1 CL / 3 Open PoW, threshold 7), 17 uniform algos, 25% Producer (20%/5% PoS) / 75% Equal-Pay Validators & ≥75% MN VRF floor (V4).',
-        descTr: '11+1 Model D öncesi komite (7 MN / 1 CL / 3 Açık PoW, eşik 7), 17 tek-geçişli algo, %25 Üretici (PoS %20/%5) / %75 Eşit Ücret ve ≥%75 MN VRF tabanı (V4).'
-      },
-      {
-        id: 'open_entry',
-        height: 2500,
-        title: 'Open-Entry Seat & Bootstrap Limit',
-        titleTr: 'Açık Katılım Koltuğu & Bootstrap Limiti',
-        desc: 'Permanent 0-KRISTA Open-Entry seat in Track 2 (2 Funded PoW-Locks + 1 Open-Entry; 240-key / 15-bit Zero-Coin).',
-        descTr: 'Kulvar 2 içinde kalıcı 0-KRISTA Açık Katılım koltuğu (2 Fonlu PoW-Lock + 1 Açık Katılım; 240 anahtar / 15-bit Zero-Coin).'
-      },
-      {
-        id: 'pombl',
-        height: 4800,
-        title: 'UPGRADE_POMBL (v12 17-Algo 3-Perm)',
-        titleTr: 'UPGRADE_POMBL (v12 17-Algo 3-Perm)',
-        desc: '17 uniform single-pass algo 3-permutations (4,080 combinations, X11KVS excluded), 33B pubkeys, 3s ADAM / 1s LLMQ grace.',
-        descTr: '17 tek-geçişli algo 3’lü permütasyon (4.080 kombinasyon, X11KVS hariç), 33B anahtar ve 3 sn ADAM / 1 sn LLMQ penceresi.'
+        title: 'Fair Launch, KTDIP3, BIP324, Open-Entry & Hardening v1–v4',
+        titleTr: 'Adil Başlangıç, KTDIP3, BIP324, Açık Katılım ve Hardening v1–v4',
+        desc: '0 premine, deterministic KTDIP3 v2 BLS PoP (mnmeta), BIP324 P2P v2, PoM/PoL/PoB, 4,200:250:10 VRF (100-blk maturity), ProUpReg cooldown, permanent 0-KRISTA Open-Entry, and 2/3 BFT LLMQ.',
+        descTr: '0 ön madencilik, deterministik KTDIP3 v2 BLS PoP (mnmeta), BIP324 P2P v2, PoM/PoL/PoB, 4.200:250:10 VRF (100-blok olgunluk), ProUpReg bekleme, kalıcı 0-KRISTA Açık Katılım ve 2/3 BFT LLMQ.'
       },
       {
         id: 'model_d',
-        height: 5000,
-        title: 'Balanced Model D (5/10/60/25 • 15+1 • ≥55% VRF)',
-        titleTr: 'Dengeli Model D (5/10/60/25 • 15+1 • ≥%55 VRF)',
-        desc: '15+1 committee (8 MN / 2 CL / 5 Open PoW; thr 8), Equal-Pay 60%/15 (4.00%), 5% MN, PoS 22%/3%, ≥55% MN VRF floor (V5), Dynamic 2/3 BFT LLMQ (4/5–11/15), MESCAL v2 & Stake Min Depth V2 (#5,001).',
-        descTr: '15+1 komite (8 MN / 2 CL / 5 Açık PoW; eşik 8), Eşit Ücret %60/15 (%4,00), %5 MN, PoS %22/%3, ≥%55 MN VRF tabanı (V5), Dinamik 2/3 BFT LLMQ (4/5–11/15), MESCAL v2 ve Stake Min Derinlik V2 (#5.001).'
+        height: 200,
+        title: 'Balanced Model D, PoMBL v12 & PoBLS (#200)',
+        titleTr: 'Dengeli Model D, PoMBL v12 ve PoBLS (#200)',
+        desc: '15+1 committee (8 MN / 2 CL / 5 Open PoW; thr 8), Equal-Pay 60%/15 (4.00%), 5% MN, PoS 22%/3%, 17-Algo 3-Perm v12 (4,080), ≥55% MN VRF floor (V5), Dynamic 2/3 BFT LLMQ (4/5–11/15), and Developer Treasury governance.',
+        descTr: '15+1 komite (8 MN / 2 CL / 5 Açık PoW; eşik 8), Eşit Ücret %60/15 (%4,00), %5 MN, PoS %22/%3, 17-Algo 3-Perm v12 (4.080), ≥%55 MN VRF tabanı (V5), Dinamik 2/3 BFT LLMQ (4/5–11/15) ve Hazine yönetişimi.'
+      },
+      {
+        id: 'stake_maturity_v2',
+        height: 601,
+        title: 'PoS 600-Confirmation Staking Maturity',
+        titleTr: 'PoS 600-Onay Staking Olgunluğu',
+        desc: 'First PoS coinstakes meeting UPGRADE_STAKE_MIN_DEPTH_V2 (activated at #200) reach 600-block maturity window, enabling full PoS/PoW hybrid block alternation.',
+        descTr: '#200. blokta aktifleşen UPGRADE_STAKE_MIN_DEPTH_V2 sonrası 600-blok olgunluğa ulaşan ilk çıktılarla tam PoS/PoW hibrit blok üretimi başlar.'
+      },
+      {
+        id: 'bootstrap_limit',
+        height: 2500,
+        title: 'ADAM Bootstrap Window Completion',
+        titleTr: 'ADAM Başlangıç Penceresi Tamamlanması',
+        desc: 'nAdamBootstrapLimit (2,500) concludes initial bootstrap allowances with full validator queue saturation and 240-key / 15-bit Zero-Coin Sybil enforcement.',
+        descTr: 'nAdamBootstrapLimit (2.500) ilk başlangıç toleransını tamamlar; 240 anahtarlı / 15-bit Zero-Coin Sybil koruması tam kapasiteyle sürer.'
       },
       {
         id: 'phase_d',
@@ -183,12 +175,12 @@ export default defineEventHandler(async (event) => {
       activeMnCount,
       bip324PeersCount,
       modelDSplitsCurrent: calculateModelDSplits(currentHeight, undefined, activeMnCount),
-      modelDSplitsFull: calculateModelDSplits(Math.max(5000, currentHeight), undefined, activeMnCount),
+      modelDSplitsFull: calculateModelDSplits(Math.max(MODEL_D_ACTIVATION_HEIGHT, currentHeight), undefined, activeMnCount),
       blockSeries,
       txBreakdown,
       roadmap,
       peers,
-      sporks
+      upgrades
     }
 
     cachedNetwork = payload

@@ -35,7 +35,7 @@ const endpoints = [
   {
     method: 'GET',
     path: '/api/network',
-    desc: '60-block chart series, upgrade roadmap, Model D splits, privacy-masked BIP324 v2 peers, and Sporks.',
+    desc: '60-block chart series, upgrade roadmap, Model D splits, privacy-masked BIP324 v2 peers, and active protocol upgrades.',
     category: 'Chain Telemetry'
   },
   {
@@ -138,7 +138,7 @@ const endpoints = [
   {
     method: 'GET',
     path: '/api/validators',
-    desc: 'Active ADAM validator pool, Dual-Track quotas (Balanced Model D 8/2/5, 60%/15 = 4.00%; Pre-Model D 7/1/3), KTDIP3 Masternodes (BLS12-381, PoSe), 4,200:250:10 VRF (≥55% Model D V5 / ≥75% Pre-Model D V4 MN floor), and Dynamic 2/3 BFT LLMQ (4/5–11/15).',
+    desc: 'Active ADAM validator pool, Dual-Track quotas (Balanced Model D 8/2/5, 60%/15 = 4.00%), KTDIP3 Masternodes (BLS12-381, PoSe), 4,200:250:10 VRF (≥55% MN floor, ADAM_FAIR_COORD_V5), and Dynamic 2/3 BFT LLMQ (4/5–11/15).',
     category: 'Consensus & Validators'
   },
   {

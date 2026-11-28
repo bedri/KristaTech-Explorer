@@ -7,7 +7,7 @@ import { formatBytes, formatCoins, formatHashrate, formatNumber } from '~/utils/
 const { locale, t } = useI18n()
 const { data: net, refresh } = await useFetch('/api/network')
 
-const simHeight = ref(5000)
+const simHeight = ref(200)
 const simActiveMns = ref(net.value?.activeMnCount || 5)
 watch(
   () => net.value?.activeMnCount,
@@ -243,7 +243,7 @@ const volumeBars = computed(() => {
             class="w-28 h-9 px-3 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 font-mono text-xs font-bold"
           />
           <button
-            v-for="preset in [100, 500, 2500, 4800, 5000, 259202]"
+            v-for="preset in [100, 200, 601, 2500, 259202]"
             :key="preset"
             type="button"
             @click="simHeight = preset"
@@ -284,7 +284,7 @@ const volumeBars = computed(() => {
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.treasury, 4) }}</div>
         </div>
         <div class="p-3.5 rounded-xl bg-brand-blue/10 border border-brand-blue/20">
-          <div class="text-brand-blue font-semibold">Passive MN ({{ simHeight >= 5000 ? '5%' : '0%' }})</div>
+          <div class="text-brand-blue font-semibold">Passive MN ({{ simHeight >= 200 ? '5%' : '0%' }})</div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.passiveMn, 4) }}</div>
         </div>
         <div class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
@@ -293,21 +293,21 @@ const volumeBars = computed(() => {
           </div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.producer, 4) }}</div>
           <div v-if="simHeight >= 200" class="text-[10px] text-slate-500 mt-0.5">
-            PoS: {{ simHeight >= 5000 ? '22%' : '20%' }} ({{ simSplits.posStaker }}) + {{ simHeight >= 5000 ? '3%' : '5%' }} Coord ({{ simSplits.posCoordinator }})
+            PoS: 22% ({{ simSplits.posStaker }}) + 3% Coord ({{ simSplits.posCoordinator }})
           </div>
         </div>
         <div class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
           <div class="text-emerald-700 dark:text-emerald-300 font-semibold">
-            LLMQ ({{ simHeight >= 5000 ? '10%' : '0%' }})
+            LLMQ ({{ simHeight >= 200 ? '10%' : '0%' }})
           </div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.llmqTotal, 4) }}</div>
-          <div v-if="simHeight >= 5000" class="text-[10px] text-slate-500 mt-0.5">
+          <div v-if="simHeight >= 200" class="text-[10px] text-slate-500 mt-0.5">
             LLMQ {{ simLlmqSpec.threshold }}/{{ simLlmqSpec.size }} • {{ simSplits.llmqPerSigner }}/signer
           </div>
         </div>
         <div class="p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
           <div class="text-sky-700 dark:text-sky-300 font-semibold">
-            {{ simSplits.committeeSeats || 15 }} Seat Pool ({{ simHeight >= 5000 ? '60%' : simHeight >= 200 ? '75%' : '0%' }})
+            {{ simSplits.committeeSeats || 15 }} Seat Pool ({{ simHeight >= 200 ? '60%' : '0%' }})
           </div>
           <div class="text-base font-extrabold text-slate-800 dark:text-white mt-0.5">{{ formatCoins(simSplits.committeeTotal, 4) }}</div>
           <div class="text-[10px] text-slate-500 mt-0.5">
@@ -322,11 +322,9 @@ const volumeBars = computed(() => {
           <span class="font-bold text-slate-700 dark:text-slate-200">Track Quotas:</span>
           <span class="ml-1.5 text-slate-600 dark:text-slate-300 font-mono">
             {{
-              simHeight >= 5000
+              simHeight >= 200
                 ? `${simTrackSpec.masternodeQuota} MN + ${simTrackSpec.coinLockQuota} CL + ${simTrackSpec.openPowQuota} Open PoW (3 Funded + 2 Zero-Coin) • thr ${simTrackSpec.threshold}`
-                : simHeight >= 200
-                  ? `${simTrackSpec.masternodeQuota} MN + ${simTrackSpec.coinLockQuota} CL + ${simTrackSpec.openPowQuota} Open PoW (${simHeight >= 2500 ? '2 Funded + 1 Open' : '2 Funded + 1 Open @ #2,500'}) • thr ${simTrackSpec.threshold}`
-                  : 'Bootstrap X11KVS PoW (#0–#199)'
+                : 'Bootstrap X11KVS PoW (#0–#199)'
             }}
           </span>
         </div>
@@ -334,24 +332,22 @@ const volumeBars = computed(() => {
           <span class="font-bold text-slate-700 dark:text-slate-200">Coordinator VRF:</span>
           <span class="ml-1.5 text-slate-600 dark:text-slate-300 font-mono">
             {{
-              simHeight >= 5000
+              simHeight >= 200
                 ? '4,200:250:10 • ≥55% MN Floor (11×Non-MN > 9×MN, V5) • 100-blk maturity'
-                : simHeight >= 200
-                  ? '4,200:250:10 • ≥75% MN Floor (3×Non-MN > MN, V4) • 100-blk maturity'
-                  : 'Activates @ #200 (V4 ≥75%) → #5,000 (V5 ≥55%)'
+                : 'Balanced Model D @ #200 (V5 ≥55% MN Floor)'
             }}
           </span>
         </div>
         <div class="px-3.5 py-2.5 rounded-xl bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10">
           <span class="font-bold text-slate-700 dark:text-slate-200">Stake Min Depth:</span>
           <span class="ml-1.5 text-slate-600 dark:text-slate-300 font-mono">
-            {{ simHeight >= 5001 ? '600 blocks (V2 @ #5,001+)' : simHeight >= 200 ? '100 blocks (#200–#5,000)' : 'Inactive (< #200)' }}
+            {{ simHeight >= 601 ? '600 blocks (V2 @ #200; mature @ #601+)' : simHeight >= 200 ? '600 blocks (V2 @ #200; maturing until #601)' : 'Inactive (< #200)' }}
           </span>
         </div>
       </div>
     </div>
 
-    <!-- Connected Peers (Privacy-Masked) & Active Sporks -->
+    <!-- Connected Peers (Privacy-Masked) & Active Protocol Upgrades -->
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
       <div class="glass-card rounded-2xl p-6 space-y-4 data-panel-contain">
         <h2 id="peers-table-caption" class="text-base font-bold text-slate-800 dark:text-white">
@@ -388,28 +384,28 @@ const volumeBars = computed(() => {
       </div>
 
       <div class="glass-card rounded-2xl p-6 space-y-4 data-panel-contain">
-        <h2 id="sporks-table-caption" class="text-base font-bold text-slate-800 dark:text-white">
-          {{ t('sporkGovernance') }}
+        <h2 id="upgrades-table-caption" class="text-base font-bold text-slate-800 dark:text-white">
+          {{ t('protocolUpgrades') }}
         </h2>
-        <div tabindex="0" role="region" aria-labelledby="sporks-table-caption" class="table-wrapper">
+        <div tabindex="0" role="region" aria-labelledby="upgrades-table-caption" class="table-wrapper">
           <table class="text-left text-xs sm:text-sm">
             <thead class="bg-slate-100 dark:bg-slate-900/95 text-slate-700 dark:text-gray-300 font-semibold uppercase text-xs">
               <tr>
-                <th scope="col" class="p-3">Spork</th>
-                <th scope="col" class="p-3">Value</th>
+                <th scope="col" class="p-3">Upgrade</th>
+                <th scope="col" class="p-3">Height</th>
                 <th scope="col" class="p-3 text-right">State</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200/60 dark:divide-white/5">
-              <tr v-for="s in net?.sporks || []" :key="s.name">
-                <td class="p-3 font-mono text-xs font-semibold">{{ s.name }}</td>
-                <td class="p-3 font-mono text-xs text-slate-500">{{ s.value }}</td>
+              <tr v-for="u in net?.upgrades || []" :key="u.name" :title="u.info">
+                <td class="p-3 font-mono text-xs font-semibold">{{ u.name }}</td>
+                <td class="p-3 font-mono text-xs text-slate-500">#{{ formatNumber(u.activationHeight, 0) }}</td>
                 <td class="p-3 text-right">
                   <span
                     class="px-2 py-0.5 rounded text-[11px] font-bold"
-                    :class="s.active ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-slate-500/10 text-slate-500'"
+                    :class="u.active ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-slate-500/10 text-slate-500'"
                   >
-                    {{ s.active ? 'ACTIVE' : 'DEFAULT' }}
+                    {{ u.active ? 'ACTIVE' : String(u.status || 'PENDING').toUpperCase() }}
                   </span>
                 </td>
               </tr>

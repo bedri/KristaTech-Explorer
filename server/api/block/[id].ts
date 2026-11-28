@@ -3,6 +3,7 @@ import { dbGet, dbQuery, isBurnAddress, TREASURY_ADDRESS } from '../../utils/db'
 import { setCacheControl } from '../../utils/api'
 import { getValidatorPoolData } from '../validators'
 import {
+  MODEL_D_ACTIVATION_HEIGHT,
   calculateBlockSubsidy,
   classifyBlockRewardOutputs
 } from '../../../app/utils/protocol'
@@ -112,7 +113,7 @@ export default defineEventHandler(async (event) => {
 
       // Under UPGRADE_FAIRNESS (Height 1), Model D 10% LLMQ rewards in block H pay prevBlock (H-1) signers (1-block lag).
       const prevLlmqSignerAddrs = new Set<string>()
-      if (block.height >= 5000) {
+      if (block.height >= MODEL_D_ACTIVATION_HEIGHT) {
         try {
           const prevQuorumRow = await dbGet('SELECT adam_quorum_signers FROM blocks WHERE height = ?', [
             block.height - 1

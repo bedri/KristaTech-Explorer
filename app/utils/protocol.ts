@@ -52,7 +52,8 @@ export interface AdamTrackSpec {
 
 export const TARGET_BLOCK_TIME_SECONDS = 30
 export const DECAY_INTERVAL_BLOCKS = 259200
-export const MODEL_D_ACTIVATION_HEIGHT = 5000
+export const MODEL_D_ACTIVATION_HEIGHT = 200
+export const STAKE_MATURITY_V2_HEIGHT = 601
 export const ADAM_COORD_WEIGHT_MASTERNODE = 4200
 export const ADAM_COORD_WEIGHT_COIN_LOCK = 250
 export const ADAM_COORD_WEIGHT_POW_LOCK = 10
@@ -70,7 +71,7 @@ export const ADAM_PUZZLE_ALGO_COUNT = 17
 export const ADAM_V12_PERMUTATION_COUNT = 4080
 
 /**
- * Returns Pre-Model D (11+1) or Balanced Model D (15+1) track quotas and thresholds.
+ * Returns Bootstrap PoW (< 200) or unified Balanced Model D (15+1 @ #200+) track quotas and thresholds.
  */
 export function getAdamTrackSpec(height: number): AdamTrackSpec {
   const h = Math.max(0, Math.floor(Number(height) || 0))
@@ -91,16 +92,16 @@ export function getAdamTrackSpec(height: number): AdamTrackSpec {
   }
   return {
     isModelD: false,
-    isBootstrapPow: h < 200,
-    committeeActive: h >= 200,
-    committeeSize: ADAM_COMMITTEE_SIZE,
-    masternodeQuota: ADAM_MASTERNODE_TRACK_QUOTA,
-    coinLockQuota: ADAM_COIN_LOCK_TRACK_QUOTA,
-    openPowQuota: ADAM_OPEN_POW_TRACK_QUOTA,
-    zeroCoinMaxSeats: 1,
-    threshold: 7,
-    committeePoolPct: 75,
-    perSeatNetPct: 6.82
+    isBootstrapPow: true,
+    committeeActive: false,
+    committeeSize: ADAM_MODELD_COMMITTEE_SIZE,
+    masternodeQuota: ADAM_MODELD_MASTERNODE_TRACK_QUOTA,
+    coinLockQuota: ADAM_MODELD_COIN_LOCK_TRACK_QUOTA,
+    openPowQuota: ADAM_MODELD_OPEN_POW_TRACK_QUOTA,
+    zeroCoinMaxSeats: ADAM_MODELD_ZERO_COIN_OPEN_SEATS,
+    threshold: 8,
+    committeePoolPct: 60,
+    perSeatNetPct: 4
   }
 }
 
@@ -200,63 +201,32 @@ export function calculateTotalSupply(height: number): number {
 export function buildConsensusInfo(height: number): MilestoneInfo {
   const h = Math.max(0, Math.floor(height || 0))
 
-  if (h < 200) {
-    const rem = 200 - h
+  if (h < MODEL_D_ACTIVATION_HEIGHT) {
+    const rem = MODEL_D_ACTIVATION_HEIGHT - h
     return {
       currentEra: 'Bootstrap PoW',
       currentEraTr: 'Başlangıç PoW',
       algorithmLabel: 'Bootstrap PoW • X11KVS',
-      nextHeight: 200,
-      nextLabel: 'ADAM v1 Cooperative Consensus',
-      nextLabelTr: 'ADAM v1 İşbirlikçi Konsensüs',
-      progressPct: Math.min(100, Math.round((h / 200) * 1000) / 10),
+      nextHeight: MODEL_D_ACTIVATION_HEIGHT,
+      nextLabel: 'Balanced Model D, PoMBL v12 & PoBLS',
+      nextLabelTr: 'Dengeli Model D, PoMBL v12 ve PoBLS',
+      progressPct: Math.min(100, Math.round((h / MODEL_D_ACTIVATION_HEIGHT) * 1000) / 10),
       blocksRemaining: rem,
       etaSeconds: rem * TARGET_BLOCK_TIME_SECONDS
     }
   }
 
-  if (h < 2500) {
-    const rem = 2500 - h
-    const span = 2500 - 200
+  if (h < STAKE_MATURITY_V2_HEIGHT) {
+    const rem = STAKE_MATURITY_V2_HEIGHT - h
+    const span = STAKE_MATURITY_V2_HEIGHT - MODEL_D_ACTIVATION_HEIGHT
     return {
-      currentEra: 'ADAM Dual-Track (Pre-Model D)',
-      currentEraTr: 'ADAM Çift Kulvar (Model D Öncesi)',
-      algorithmLabel: 'ADAM Dual-Track • 17-Algo VRF',
-      nextHeight: 2500,
-      nextLabel: 'Permanent 0-KRISTA Open-Entry Seat',
-      nextLabelTr: 'Kalıcı 0-KRISTA Açık Katılım Koltuğu',
-      progressPct: Math.min(100, Math.round(((h - 200) / span) * 1000) / 10),
-      blocksRemaining: rem,
-      etaSeconds: rem * TARGET_BLOCK_TIME_SECONDS
-    }
-  }
-
-  if (h < 4800) {
-    const rem = 4800 - h
-    const span = 4800 - 2500
-    return {
-      currentEra: 'ADAM Dual-Track • Open-Entry Active',
-      currentEraTr: 'ADAM Çift Kulvar • Açık Katılım Aktif',
-      algorithmLabel: 'ADAM Dual-Track • 17-Algo VRF',
-      nextHeight: 4800,
-      nextLabel: 'UPGRADE_POMBL (v12 17-Algo 3-Perm)',
-      nextLabelTr: 'UPGRADE_POMBL (v12 17-Algo 3-Perm)',
-      progressPct: Math.min(100, Math.round(((h - 2500) / span) * 1000) / 10),
-      blocksRemaining: rem,
-      etaSeconds: rem * TARGET_BLOCK_TIME_SECONDS
-    }
-  }
-
-  if (h < 5000) {
-    const rem = 5000 - h
-    return {
-      currentEra: 'PoMBL (Block v12)',
-      currentEraTr: 'PoMBL (Blok v12)',
-      algorithmLabel: 'PoMBL v12 • 17-Algo 3-Perm (4,080)',
-      nextHeight: 5000,
-      nextLabel: 'Balanced Model D / ADAM v2 (15+1 • 5/10/60/25)',
-      nextLabelTr: 'Dengeli Model D / ADAM v2 (15+1 • 5/10/60/25)',
-      progressPct: Math.min(100, Math.round(((h - 4800) / 200) * 1000) / 10),
+      currentEra: 'Balanced Model D (PoBLS + 2/3 BFT LLMQ)',
+      currentEraTr: 'Dengeli Model D (PoBLS + 2/3 BFT LLMQ)',
+      algorithmLabel: 'PoMBL v12 • 17-Algo 3-Perm & ≥55% VRF',
+      nextHeight: STAKE_MATURITY_V2_HEIGHT,
+      nextLabel: 'PoS 600-Confirmation Staking Maturity',
+      nextLabelTr: 'PoS 600-Onay Staking Olgunluğu',
+      progressPct: Math.min(100, Math.round(((h - MODEL_D_ACTIVATION_HEIGHT) / span) * 1000) / 10),
       blocksRemaining: rem,
       etaSeconds: rem * TARGET_BLOCK_TIME_SECONDS
     }
@@ -306,7 +276,7 @@ export function calculateModelDSplits(height: number, customSubsidy?: number, ac
   const treasurySats = Math.floor((totalSats * 7) / 100)
   const netPoolSats = totalSats - treasurySats
 
-  if (height < 200) {
+  if (height < MODEL_D_ACTIVATION_HEIGHT) {
     return {
       subsidy: fromSatoshi(totalSats),
       treasury: fromSatoshi(treasurySats),
@@ -324,33 +294,6 @@ export function calculateModelDSplits(height: number, customSubsidy?: number, ac
       mnSeatEach: 0,
       coinLockSeat: 0,
       openPowSeatEach: 0
-    }
-  }
-
-  if (height < 5000) {
-    // UPGRADE_FAIRNESS Pre-Model D: 25% Producer (PoS: 20% Staker + 5% Coord) / 75% Equal-Pay Validators (11 seats)
-    const committeeSats = Math.floor((netPoolSats * 75) / 100)
-    const producerSats = netPoolSats - committeeSats
-    const posCoordinatorSats = Math.floor((netPoolSats * 5) / 100)
-    const posStakerSats = producerSats - posCoordinatorSats
-    const committeeSeatEach = fromSatoshi(Math.floor(committeeSats / ADAM_COMMITTEE_SIZE))
-    return {
-      subsidy: fromSatoshi(totalSats),
-      treasury: fromSatoshi(treasurySats),
-      netPool: fromSatoshi(netPoolSats),
-      passiveMn: 0,
-      producer: fromSatoshi(producerSats),
-      posStaker: fromSatoshi(posStakerSats),
-      posCoordinator: fromSatoshi(posCoordinatorSats),
-      llmqTotal: 0,
-      llmqPerSigner: 0,
-      llmqQuorumSize: 0,
-      committeeSeats: ADAM_COMMITTEE_SIZE,
-      committeeTotal: fromSatoshi(committeeSats),
-      committeeSeatEach,
-      mnSeatEach: committeeSeatEach,
-      coinLockSeat: committeeSeatEach,
-      openPowSeatEach: committeeSeatEach
     }
   }
 
@@ -387,8 +330,8 @@ export function calculateModelDSplits(height: number, customSubsidy?: number, ac
 
 /**
  * Computes exact UPGRADE_FAIRNESS Coordinator VRF weights (`4,200 : 250 : 10`, src/adam.cpp:2563-2594):
- * - Pre-Model D (< 5,000, ADAM_FAIR_COORD_V4): >= 75% Active MN floor when 3 * sumNonMN > sumMN
- * - Balanced Model D (>= 5,000, ADAM_FAIR_COORD_V5): >= 55% Active MN floor when 11 * sumNonMN > 9 * sumMN
+ * - Balanced Model D (>= 200, ADAM_FAIR_COORD_V5): >= 55% Active MN floor when 11 * sumNonMN > 9 * sumMN
+ * - Bootstrap / Pre-Model D (< 200, ADAM_FAIR_COORD_V4): >= 75% Active MN floor when 3 * sumNonMN > sumMN
  * - Zero per-track caps; Hardening v4 enforces 100-block key maturity for VRF eligibility.
  */
 export function calculateCoordinatorWeights(
@@ -588,7 +531,7 @@ export function classifyBlockRewardOutputs(
   const near = (sats: number, target: number, tol = 25) =>
     target > 0 && Math.abs(sats - target) <= tol
 
-  // Count how many non-treasury, non-burn payouts exist after producer/staker in Model D vs Pre-Model D
+  // Count how many non-treasury, non-burn payouts exist after producer/staker in Balanced Model D
   const solvedCountHint = ctx.solvedSeatCount ?? (ctx.solvedCommitteeAddrs?.size || 0)
   let remainingCommitteeSlots = solvedCountHint
   let assignedPassiveMn = false
@@ -616,7 +559,7 @@ export function classifyBlockRewardOutputs(
       return { ...out, role: 'treasury' }
     }
 
-    if (ctx.height >= 5000) {
+    if (ctx.height >= MODEL_D_ACTIVATION_HEIGHT) {
       if (!ctx.isProofOfStake && out.n === 0) {
         return { ...out, role: 'producer' }
       }
@@ -659,32 +602,6 @@ export function classifyBlockRewardOutputs(
       role = !assignedPassiveMn ? 'masternode' : 'committee'
       if (!assignedPassiveMn) assignedPassiveMn = true
       return { ...out, role }
-    }
-
-    if (ctx.height >= 200) {
-      if (!ctx.isProofOfStake && out.n === 0) {
-        return { ...out, role: 'producer' }
-      }
-      if (ctx.isProofOfStake && out.n === 1) {
-        return { ...out, role: 'staker' }
-      }
-      if (
-        ctx.isProofOfStake &&
-        !assignedPosCoord &&
-        idx === lastConsensusIdx &&
-        (near(sats, posCoordSats, 5) || (Boolean(ctx.adamCoordinator) && addr === ctx.adamCoordinator))
-      ) {
-        assignedPosCoord = true
-        return { ...out, role: 'coordinator' }
-      }
-      if (ctx.solvedCommitteeAddrs?.has(addr) || near(sats, committeeSeatSats, 50)) {
-        return { ...out, role: 'committee' }
-      }
-      if (ctx.isProofOfStake && !assignedPosCoord && near(sats, posCoordSats, 5)) {
-        assignedPosCoord = true
-        return { ...out, role: 'coordinator' }
-      }
-      return { ...out, role: ctx.isProofOfStake ? 'staker' : 'producer' }
     }
 
     return { ...out, role }
